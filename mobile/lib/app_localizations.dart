@@ -1449,19 +1449,19 @@ abstract class AppLocalizations {
   /// No description provided for @botAnswered.
   ///
   /// In az, this message translates to:
-  /// **'Bot cavabladı ✓'**
+  /// **'Bot cavabladı'**
   String get botAnswered;
 
   /// No description provided for @youWon.
   ///
   /// In az, this message translates to:
-  /// **'Siz Qazandınız! 🎉'**
+  /// **'Siz Qazandınız!'**
   String get youWon;
 
   /// No description provided for @botWon.
   ///
   /// In az, this message translates to:
-  /// **'Bot Qazandı 🤖'**
+  /// **'Bot Qazandı'**
   String get botWon;
 
   /// No description provided for @opponentThinking.
@@ -1473,7 +1473,7 @@ abstract class AppLocalizations {
   /// No description provided for @opponentAnswered.
   ///
   /// In az, this message translates to:
-  /// **'cavabladı ✓'**
+  /// **'cavabladı'**
   String get opponentAnswered;
 
   /// No description provided for @opponentWon.
@@ -1485,13 +1485,13 @@ abstract class AppLocalizations {
   /// No description provided for @youLost.
   ///
   /// In az, this message translates to:
-  /// **'Siz Uduzdunuz 💔'**
+  /// **'Siz Uduzdunuz'**
   String get youLost;
 
   /// No description provided for @drawResult.
   ///
   /// In az, this message translates to:
-  /// **'Bərabərlik! 🤝'**
+  /// **'Bərabərlik!'**
   String get drawResult;
 
   /// No description provided for @yourScore.
@@ -1601,6 +1601,222 @@ abstract class AppLocalizations {
   /// In az, this message translates to:
   /// **'Bağlantı kəsildi'**
   String get connectionLostMessage;
+
+  /// No description provided for @battleStartingTitle.
+  ///
+  /// In az, this message translates to:
+  /// **'DÖYÜŞ BAŞLAYIR'**
+  String get battleStartingTitle;
+
+  /// No description provided for @battleWord.
+  ///
+  /// In az, this message translates to:
+  /// **'DÖYÜŞ!'**
+  String get battleWord;
+
+  /// No description provided for @sendFriendRequestLabel.
+  ///
+  /// In az, this message translates to:
+  /// **'Dostluq göndər'**
+  String get sendFriendRequestLabel;
+
+  /// No description provided for @friendRequestSentLabel.
+  ///
+  /// In az, this message translates to:
+  /// **'Sorğu göndərildi'**
+  String get friendRequestSentLabel;
+
+  /// No description provided for @matchHistoryEmpty.
+  ///
+  /// In az, this message translates to:
+  /// **'Hələ matç tarixçəsi yoxdur'**
+  String get matchHistoryEmpty;
+
+  /// No description provided for @matchHistoryError.
+  ///
+  /// In az, this message translates to:
+  /// **'Tarixçə yüklənmədi'**
+  String get matchHistoryError;
+
+  /// No description provided for @matchOutcomeWin.
+  ///
+  /// In az, this message translates to:
+  /// **'QALİB'**
+  String get matchOutcomeWin;
+
+  /// No description provided for @matchOutcomeLoss.
+  ///
+  /// In az, this message translates to:
+  /// **'MƏĞLUB'**
+  String get matchOutcomeLoss;
+
+  /// No description provided for @matchOutcomeDraw.
+  ///
+  /// In az, this message translates to:
+  /// **'HEÇ-HEÇƏ'**
+  String get matchOutcomeDraw;
+
+  /// No description provided for @matchOutcomeSolo.
+  ///
+  /// In az, this message translates to:
+  /// **'SOLO'**
+  String get matchOutcomeSolo;
+
+  /// No description provided for @matchType1v1.
+  ///
+  /// In az, this message translates to:
+  /// **'1v1'**
+  String get matchType1v1;
+
+  /// No description provided for @matchTypeTournament.
+  ///
+  /// In az, this message translates to:
+  /// **'Turnir'**
+  String get matchTypeTournament;
+
+  /// No description provided for @matchTypeSolo.
+  ///
+  /// In az, this message translates to:
+  /// **'Solo'**
+  String get matchTypeSolo;
+
+  /// No description provided for @editProfileTitle.
+  ///
+  /// In az, this message translates to:
+  /// **'Profili Düzəlt'**
+  String get editProfileTitle;
+
+  /// No description provided for @chooseAvatar.
+  ///
+  /// In az, this message translates to:
+  /// **'Avatar seç'**
+  String get chooseAvatar;
+
+  /// No description provided for @chooseFrame.
+  ///
+  /// In az, this message translates to:
+  /// **'Çərçivə'**
+  String get chooseFrame;
+
+  /// No description provided for @chooseColor.
+  ///
+  /// In az, this message translates to:
+  /// **'Rəng'**
+  String get chooseColor;
+
+  /// No description provided for @useInitialLetter.
+  ///
+  /// In az, this message translates to:
+  /// **'İlk hərf'**
+  String get useInitialLetter;
+
+  /// No description provided for @saveAction.
+  ///
+  /// In az, this message translates to:
+  /// **'Yadda saxla'**
+  String get saveAction;
+
+  /// No description provided for @profileUpdated.
+  ///
+  /// In az, this message translates to:
+  /// **'Profil yeniləndi'**
+  String get profileUpdated;
+
+  /// No description provided for @editProfileTooltip.
+  ///
+  /// In az, this message translates to:
+  /// **'Profili düzəlt'**
+  String get editProfileTooltip;
+
+  /// No description provided for @usernameAvailable.
+  ///
+  /// In az, this message translates to:
+  /// **'Ad uyğundur'**
+  String get usernameAvailable;
+
+  /// No description provided for @signupOtpTitle.
+  ///
+  /// In az, this message translates to:
+  /// **'Email-i təsdiqlə'**
+  String get signupOtpTitle;
+
+  /// No description provided for @signupOtpSubtitle.
+  ///
+  /// In az, this message translates to:
+  /// **'Email ünvanınıza göndərilən 6-rəqəmli kodu daxil edin'**
+  String get signupOtpSubtitle;
+
+  /// No description provided for @signupOtpVerify.
+  ///
+  /// In az, this message translates to:
+  /// **'TƏSDİQLƏ'**
+  String get signupOtpVerify;
+
+  /// No description provided for @signupOtpResend.
+  ///
+  /// In az, this message translates to:
+  /// **'Kodu yenidən göndər'**
+  String get signupOtpResend;
+
+  /// No description provided for @signupOtpResendIn.
+  ///
+  /// In az, this message translates to:
+  /// **'{seconds} san sonra yenidən göndər'**
+  String signupOtpResendIn(int seconds);
+
+  /// No description provided for @signupOtpInvalid.
+  ///
+  /// In az, this message translates to:
+  /// **'Kod yanlışdır və ya vaxtı keçib'**
+  String get signupOtpInvalid;
+
+  /// No description provided for @signupOtpSent.
+  ///
+  /// In az, this message translates to:
+  /// **'Kod email ünvanınıza göndərildi'**
+  String get signupOtpSent;
+
+  /// No description provided for @otpCodeLength.
+  ///
+  /// In az, this message translates to:
+  /// **'Tam 6 rəqəm tələb olunur'**
+  String get otpCodeLength;
+
+  /// No description provided for @claimDeviceTitle.
+  ///
+  /// In az, this message translates to:
+  /// **'Yeni cihaz qeyd et'**
+  String get claimDeviceTitle;
+
+  /// No description provided for @claimDeviceSubtitle.
+  ///
+  /// In az, this message translates to:
+  /// **'Hesabınız başqa cihazda aktivdir. Bu cihazı qeyd etmək üçün email-ə göndərilən kodu daxil edin.'**
+  String get claimDeviceSubtitle;
+
+  /// No description provided for @claimDeviceContinue.
+  ///
+  /// In az, this message translates to:
+  /// **'BU CİHAZI QEYD ET'**
+  String get claimDeviceContinue;
+
+  /// No description provided for @claimDeviceLogout.
+  ///
+  /// In az, this message translates to:
+  /// **'Çıxış et'**
+  String get claimDeviceLogout;
+
+  /// No description provided for @claimDeviceSuccess.
+  ///
+  /// In az, this message translates to:
+  /// **'Cihaz uğurla qeyd olundu'**
+  String get claimDeviceSuccess;
+
+  /// No description provided for @claimDeviceActiveLabel.
+  ///
+  /// In az, this message translates to:
+  /// **'Hazırda aktiv'**
+  String get claimDeviceActiveLabel;
 }
 
 class _AppLocalizationsDelegate

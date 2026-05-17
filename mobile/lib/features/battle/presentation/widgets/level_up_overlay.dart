@@ -8,15 +8,15 @@ import 'package:gguiz_battle/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 
-/// 100 sÉ™viyyÉ™ 7 tier-É™ bÃ¶lÃ¼nÃ¼r: hÉ™r tier 15 sÉ™viyyÉ™dir, sonuncu tier 91-100.
-/// Tier artdÄ±qca dizayn daha zÉ™ngin olur (rÉ™nglÉ™r, emoji, animasiya).
+/// 100 səviyyə 7 tier-ə bölünür: hər tier 15 səviyyədir, sonuncu tier 91-100.
+/// Tier artdıqca dizayn daha zəngin olur (rənglər, emoji, animasiya).
 class LevelTier {
   final int index; // 1..7
   final String emoji;
   final List<Color> colors;
   final int particleCount;
   final double particleVelocity;
-  final List<String> titleLabelKey; // localized titles per tier are picked at runtime
+  final List<String> titleLabelKey;
   const LevelTier({
     required this.index,
     required this.emoji,
@@ -28,14 +28,14 @@ class LevelTier {
 }
 
 LevelTier tierForLevel(int level) {
-  // 1-15 â†’ 1, 16-30 â†’ 2, ..., 91-100 â†’ 7
+  // 1-15 → 1, 16-30 → 2, ..., 91-100 → 7
   final t = ((level - 1) ~/ 15) + 1;
   final clamped = t > 7 ? 7 : (t < 1 ? 1 : t);
   switch (clamped) {
     case 1:
       return const LevelTier(
         index: 1,
-        emoji: 'â­',
+        emoji: '⭐',
         colors: [Color(0xFF7B5CFF), Color(0xFF9B82FF)],
         particleCount: 20,
         particleVelocity: 0.25,
@@ -44,7 +44,7 @@ LevelTier tierForLevel(int level) {
     case 2:
       return const LevelTier(
         index: 2,
-        emoji: 'ðŸŒŸ',
+        emoji: '🌟',
         colors: [Color(0xFF00E5FF), Color(0xFF7B5CFF)],
         particleCount: 30,
         particleVelocity: 0.3,
@@ -53,7 +53,7 @@ LevelTier tierForLevel(int level) {
     case 3:
       return const LevelTier(
         index: 3,
-        emoji: 'ðŸ’Ž',
+        emoji: '💎',
         colors: [Color(0xFF00E096), Color(0xFF00E5FF)],
         particleCount: 40,
         particleVelocity: 0.35,
@@ -62,7 +62,7 @@ LevelTier tierForLevel(int level) {
     case 4:
       return const LevelTier(
         index: 4,
-        emoji: 'ðŸ”¥',
+        emoji: '🔥',
         colors: [Color(0xFFFF8C00), Color(0xFFFFD400)],
         particleCount: 50,
         particleVelocity: 0.4,
@@ -71,7 +71,7 @@ LevelTier tierForLevel(int level) {
     case 5:
       return const LevelTier(
         index: 5,
-        emoji: 'âš¡',
+        emoji: '⚡',
         colors: [Color(0xFFFF3ED1), Color(0xFFFF4560)],
         particleCount: 60,
         particleVelocity: 0.45,
@@ -80,7 +80,7 @@ LevelTier tierForLevel(int level) {
     case 6:
       return const LevelTier(
         index: 6,
-        emoji: 'ðŸ‘‘',
+        emoji: '👑',
         colors: [Color(0xFFFFD400), Color(0xFFFF8C00)],
         particleCount: 75,
         particleVelocity: 0.5,
@@ -90,7 +90,7 @@ LevelTier tierForLevel(int level) {
     default:
       return const LevelTier(
         index: 7,
-        emoji: 'ðŸ†',
+        emoji: '🏆',
         colors: [Color(0xFFFFD400), Color(0xFFFF3ED1), Color(0xFF00E5FF)],
         particleCount: 100,
         particleVelocity: 0.6,
@@ -112,7 +112,7 @@ String _tierTitle(AppLocalizations l10n, int tierIndex) {
   }
 }
 
-/// Level-up tÉ™brik ekranÄ±nÄ± aÃ§Ä±r. Maksimum sÉ™viyyÉ™yÉ™ Ã§atdÄ±qda da gÃ¶stÉ™rÉ™ bilÉ™r.
+/// Level-up təbrik ekranını açır. Maksimum səviyyəyə çatdıqda da göstərə bilər.
 Future<void> showLevelUpOverlay(
   BuildContext context, {
   required int oldLevel,
@@ -152,7 +152,6 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
     _confettiTop = ConfettiController(duration: const Duration(seconds: 4));
     _confettiLeft = ConfettiController(duration: const Duration(seconds: 3));
     _confettiRight = ConfettiController(duration: const Duration(seconds: 3));
-    // Tier 4+ Ã¼Ã§Ã¼n yan tÉ™rÉ™flÉ™rdÉ™n dÉ™ fiÅŸÉ™ng atÄ±lsÄ±n
     Future.microtask(() {
       _confettiTop.play();
       if (tier.index >= 4) _confettiLeft.play();
@@ -178,7 +177,6 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
       backgroundColor: Colors.transparent,
       body: Stack(
         children: [
-          // Tier rÉ™nglÉ™ri ilÉ™ radial background
           Container(
             decoration: BoxDecoration(
               gradient: RadialGradient(
@@ -190,12 +188,11 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
               ),
             ),
           ),
-          // Ãœst fiÅŸÉ™ng (geniÅŸ aÅŸaÄŸÄ±)
           Align(
             alignment: Alignment.topCenter,
             child: ConfettiWidget(
               confettiController: _confettiTop,
-              blastDirection: math.pi / 2, // aÅŸaÄŸÄ±
+              blastDirection: math.pi / 2,
               blastDirectionality: BlastDirectionality.explosive,
               numberOfParticles: tier.particleCount,
               maxBlastForce: 30 * tier.particleVelocity * 2,
@@ -206,7 +203,6 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
             ),
           ),
           if (tier.index >= 4) ...[
-            // Sol fiÅŸÉ™ng (saÄŸa doÄŸru)
             Align(
               alignment: Alignment.centerLeft,
               child: ConfettiWidget(
@@ -219,7 +215,6 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
                 colors: tier.colors,
               ),
             ),
-            // SaÄŸ fiÅŸÉ™ng (sola doÄŸru)
             Align(
               alignment: Alignment.centerRight,
               child: ConfettiWidget(
@@ -233,7 +228,6 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
               ),
             ),
           ],
-          // MÉ™rkÉ™z mÉ™zmun
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -260,7 +254,6 @@ class _LevelUpScreenState extends State<LevelUpScreen> with TickerProviderStateM
                     ),
                   ).animate().fadeIn(delay: 200.ms).slideY(begin: -0.3),
                   const SizedBox(height: 20),
-                  // Big tier-colored level badge
                   Container(
                     width: media.size.width * 0.6,
                     padding: const EdgeInsets.symmetric(vertical: 28),

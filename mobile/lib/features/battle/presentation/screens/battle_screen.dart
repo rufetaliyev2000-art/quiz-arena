@@ -10,6 +10,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../home/data/user_repository.dart';
 import '../../../home/providers/user_provider.dart';
+import '../../../profile/data/profile_customization.dart';
+import '../../../profile/providers/profile_customization_provider.dart';
+import '../../../profile/presentation/widgets/profile_avatar.dart';
 import '../../data/battle_socket_service.dart';
 import 'battle_match_screen.dart';
 
@@ -67,10 +70,13 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
         _socket.onWaiting(() {});
         _socket.onMatchStart((data) => _handleMatchStart(profile, data));
         _socket.onError((data) => _handleError(l10n, data));
+        final customization = ref.read(profileCustomizationProvider);
         _socket.joinQueue(
           userId: profile.id,
           username: profile.username,
           elo: profile.elo,
+          friendCode: profile.friendCode,
+          customization: customization.toJson(),
         );
       },
       onConnectError: (_) {
@@ -92,6 +98,14 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
     final opponentInfo = opponents?[profile.id] as Map?;
     final opponentName = opponentInfo?['username'] as String? ?? '???';
     final opponentElo = (opponentInfo?['elo'] as num?)?.toInt() ?? 1000;
+    final opponentUserId = opponentInfo?['userId'] as String? ?? '';
+    final opponentFriendCode = opponentInfo?['friendCode'] as String? ?? '';
+    final opponentCustomizationRaw = opponentInfo?['customization'] as Map?;
+    final opponentCustomization = ProfileCustomization.fromJson(
+      opponentCustomizationRaw == null
+          ? null
+          : Map<String, dynamic>.from(opponentCustomizationRaw),
+    );
 
     _searchTimeout?.cancel();
     _socket.clearListeners();
@@ -109,6 +123,9 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
           questionIndices: indices,
           opponentName: opponentName,
           opponentElo: opponentElo,
+          opponentUserId: opponentUserId,
+          opponentFriendCode: opponentFriendCode,
+          opponentCustomization: opponentCustomization,
           socket: _socket,
         ),
       ),
@@ -157,6 +174,7 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
     final l10n = AppLocalizations.of(context)!;
     final profileAsync = ref.watch(userProfileProvider);
     final localStats = ref.watch(localGameStatsProvider);
+    final customization = ref.watch(profileCustomizationProvider);
     final profile = profileAsync.valueOrNull;
     final myElo = profile?.elo ?? 1000;
     final wins = (profile?.wins ?? 0) + localStats.extraWins;
@@ -194,7 +212,7 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
                   ],
                 ).animate().fadeIn(),
                 const SizedBox(height: 40),
-                _buildArenaCard(l10n, profile?.username ?? '...', myElo),
+                _buildArenaCard(l10n, profile?.username ?? '...', myElo, customization),
                 const SizedBox(height: 32),
                 if (_searching) _buildSearching(l10n) else _buildPlayButton(l10n),
                 if (_errorMessage != null) ...[
@@ -211,7 +229,7 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
     );
   }
 
-  Widget _buildArenaCard(AppLocalizations l10n, String myName, int myElo) {
+  Widget _buildArenaCard(AppLocalizations l10n, String myName, int myElo, ProfileCustomization customization) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -226,7 +244,7 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildPlayerCard(myName, myElo, '👤', AppColors.primary),
+              _buildMyPlayerCard(myName, myElo, customization),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
@@ -236,7 +254,7 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
                 ),
                 child: Text('VS', style: AppTextStyles.headlineMedium.copyWith(color: AppColors.accentOrange)),
               ),
-              _buildPlayerCard('???', 0, '❓', AppColors.textMuted),
+              _buildUnknownPlayerCard(),
             ],
           ),
           const SizedBox(height: 20),
@@ -260,22 +278,36 @@ class _BattleScreenState extends ConsumerState<BattleScreen> {
     ).animate().fadeIn(delay: 200.ms).scale(begin: const Offset(0.95, 0.95));
   }
 
-  Widget _buildPlayerCard(String name, int elo, String emoji, Color color) {
+  Widget _buildMyPlayerCard(String name, int elo, ProfileCustomization customization) {
+    return Column(
+      children: [
+        ProfileAvatar(
+          username: name,
+          customization: customization,
+          size: 64,
+        ),
+        const SizedBox(height: 8),
+        Text(name, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+        Text('$elo ELO', style: AppTextStyles.bodySmall.copyWith(color: AppColors.primary)),
+      ],
+    );
+  }
+
+  Widget _buildUnknownPlayerCard() {
     return Column(
       children: [
         Container(
           width: 64,
           height: 64,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.15),
+            color: AppColors.textMuted.withValues(alpha: 0.15),
             shape: BoxShape.circle,
-            border: Border.all(color: color, width: 2),
+            border: Border.all(color: AppColors.textMuted, width: 2),
           ),
-          child: Center(child: Text(emoji, style: const TextStyle(fontSize: 28))),
+          child: const Icon(Icons.help_outline_rounded, size: 32, color: AppColors.textMuted),
         ),
         const SizedBox(height: 8),
-        Text(name, style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
-        if (elo > 0) Text('$elo ELO', style: AppTextStyles.bodySmall.copyWith(color: color)),
+        Text('???', style: AppTextStyles.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
       ],
     );
   }

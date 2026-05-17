@@ -6,10 +6,15 @@ import 'package:go_router/go_router.dart';
 import 'package:gguiz_battle/app_localizations.dart';
 import '../../../../core/data/quiz_questions.dart';
 import '../../../../core/providers/local_game_stats_provider.dart';
+import '../../../friends/providers/friend_provider.dart';
 import '../../../home/data/user_repository.dart';
 import '../../../home/providers/user_provider.dart';
 import '../../../missions/data/daily_mission.dart';
 import '../../../missions/providers/daily_missions_provider.dart';
+import '../../../profile/data/profile_customization.dart';
+import '../../../profile/providers/profile_customization_provider.dart';
+import '../../../profile/presentation/widgets/profile_avatar.dart';
+import 'package:dio/dio.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../data/battle_socket_service.dart';
@@ -22,6 +27,9 @@ class BattleMatchArgs {
   final List<int> questionIndices;
   final String opponentName;
   final int opponentElo;
+  final String opponentUserId;
+  final String opponentFriendCode;
+  final ProfileCustomization opponentCustomization;
   final BattleSocketService socket;
 
   BattleMatchArgs({
@@ -31,6 +39,9 @@ class BattleMatchArgs {
     required this.questionIndices,
     required this.opponentName,
     required this.opponentElo,
+    required this.opponentUserId,
+    required this.opponentFriendCode,
+    this.opponentCustomization = const ProfileCustomization(),
     required this.socket,
   });
 }
@@ -45,6 +56,8 @@ class BattleMatchScreen extends ConsumerStatefulWidget {
 
 class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   static const _totalTime = 15;
+  static const _revealDuration = Duration(milliseconds: 1800);
+  static const _introDuration = Duration(milliseconds: 3200);
 
   late final List<QuizQuestion> _questions;
   String _locale = 'az';
@@ -54,11 +67,19 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   int _myCorrect = 0;
   int _timeLeft = _totalTime;
   int? _myAnswer;
+  int? _opponentAnswer;
+  int? _myAnswerTimeMs;
+  int? _opponentAnswerTimeMs;
   bool _answered = false;
   bool _opponentAnswered = false;
+  bool _revealing = false; // hər iki cavab bitib reveal mərhələsidir
   bool _showResult = false;
+  bool _showIntro = true;
+  bool _friendRequestSent = false;
+  bool _friendRequestLoading = false;
   Map<String, dynamic>? _matchResult;
   Timer? _timer;
+  Timer? _introTimer;
   DateTime? _questionStart;
 
   @override
@@ -70,7 +91,12 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
     widget.args.socket.onMatchResult(_onMatchResult);
     widget.args.socket.onOpponentDisconnected(_onOpponentDisconnected);
 
-    _startRound();
+    // VS intro ekranı bitdikdə oyun başlasın
+    _introTimer = Timer(_introDuration, () {
+      if (!mounted) return;
+      setState(() => _showIntro = false);
+      _startRound();
+    });
   }
 
   @override
@@ -84,14 +110,22 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
       _answered = false;
       _opponentAnswered = false;
       _myAnswer = null;
+      _opponentAnswer = null;
+      _myAnswerTimeMs = null;
+      _opponentAnswerTimeMs = null;
+      _revealing = false;
       _timeLeft = _totalTime;
     });
     _questionStart = DateTime.now();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (_timeLeft <= 1) {
         t.cancel();
-        if (!_answered) _submitAnswer(-1);
-        Future.delayed(const Duration(milliseconds: 1500), _nextOrComplete);
+        // Vaxt bitdi — cavab verməyibsə "cavabsız" göndər
+        if (!_answered) {
+          _submitMyAnswer(-1);
+        }
+        // Vaxt bitdiyi üçün reveal-i məcburi başlat (rəqib gözlədilməz)
+        _tryReveal(force: true);
       } else {
         setState(() => _timeLeft--);
       }
@@ -99,32 +133,22 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   }
 
   void _selectAnswer(int index) {
-    if (_answered) return;
-    _timer?.cancel();
-    _submitAnswer(index);
-    Future.delayed(const Duration(milliseconds: 1500), _nextOrComplete);
+    if (_answered || _revealing) return;
+    _submitMyAnswer(index);
+    _tryReveal();
   }
 
-  void _submitAnswer(int index) {
+  /// Mənim seçimimi göndərir və `_answered` state qoyur — xal hesablanmır,
+  /// yalnız reveal vaxtı hesablanır.
+  void _submitMyAnswer(int index) {
     final correct = _questions[_currentQ].correct;
     final isCorrect = index == correct;
     final timeMs = DateTime.now().difference(_questionStart!).inMilliseconds;
     setState(() {
       _myAnswer = index;
       _answered = true;
-      if (isCorrect) {
-        _myCorrect++;
-        // Tez cavab daha çox xal: 100 + remainingTime*10 (rəqibin xalı ilə eyni formula)
-        final remaining = ((15000 - timeMs) / 1000).clamp(0, 15).round();
-        _myScore += 100 + remaining * 10;
-      }
+      _myAnswerTimeMs = timeMs;
     });
-    if (isCorrect) {
-      final notifier = ref.read(dailyMissionsProvider.notifier);
-      notifier.incrementProgress(MissionType.answerCorrect, 1);
-      // 5 saniyÉ™ É™rzindÉ™ cavab: timeMs < 5000
-      if (timeMs < 5000) notifier.incrementProgress(MissionType.fastAnswer, 1);
-    }
     widget.args.socket.submitAnswer(
       matchId: widget.args.matchId,
       questionIndex: _currentQ,
@@ -139,14 +163,56 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
     // Backend səhvən geri echo etsə öz cavabımızı opponent kimi saymayaq.
     final fromSocketId = data['socketId'] as String?;
     if (fromSocketId != null && fromSocketId == widget.args.socket.socketId) return;
+
+    final answerStr = data['answer'] as String? ?? '';
+    final oppIndex = answerStr.isEmpty ? -1 : (answerStr.codeUnitAt(0) - 65);
+    final timeMs = (data['timeMs'] as num?)?.toInt() ?? 15000;
+
     setState(() {
       _opponentAnswered = true;
-      if (data['isCorrect'] == true) {
-        final timeMs = data['timeMs'] as int? ?? 15000;
-        final remaining = ((15000 - timeMs) / 1000).clamp(0, 15).round();
-        _opponentScore += 100 + remaining * 10;
+      _opponentAnswer = oppIndex;
+      _opponentAnswerTimeMs = timeMs;
+    });
+    _tryReveal();
+  }
+
+  /// Hər iki cavab gəlibsə və ya vaxt bitibsə reveal-ə keç.
+  void _tryReveal({bool force = false}) {
+    if (_revealing) return;
+    if (!force && !(_answered && _opponentAnswered)) return;
+
+    _timer?.cancel();
+    final q = _questions[_currentQ];
+    final myCorrect = _myAnswer == q.correct;
+    final oppCorrect = _opponentAnswer == q.correct;
+
+    setState(() {
+      _revealing = true;
+      if (myCorrect) {
+        _myCorrect++;
+        _myScore += _scoreFor(_myAnswerTimeMs ?? 15000);
+      }
+      if (oppCorrect) {
+        _opponentScore += _scoreFor(_opponentAnswerTimeMs ?? 15000);
       }
     });
+
+    if (myCorrect) {
+      final notifier = ref.read(dailyMissionsProvider.notifier);
+      notifier.incrementProgress(MissionType.answerCorrect, 1);
+      if ((_myAnswerTimeMs ?? 15000) < 5000) {
+        notifier.incrementProgress(MissionType.fastAnswer, 1);
+      }
+    }
+
+    Future.delayed(_revealDuration, _nextOrComplete);
+  }
+
+  /// Score formula: doğru cavab = 100 + sürət bonusu (qalan saniyə * 10).
+  /// Cavabsız (-1) vaxtı 15000 olur, score = 0 olmalıdır — yalnız doğru index üçün çağrılır.
+  int _scoreFor(int timeMs) {
+    final remaining = ((15000 - timeMs) / 1000).clamp(0, 15).round();
+    return 100 + remaining * 10;
   }
 
   void _nextOrComplete() {
@@ -168,7 +234,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
 
   void _onMatchResult(Map<String, dynamic> data) {
     if (!mounted) return;
-    if (_resultProcessed) return; // server təkrar göndərsə də yalnız 1 dəfə
+    if (_resultProcessed) return;
     _resultProcessed = true;
     final myReward = (data['rewards'] as Map?)?[widget.args.userId];
     int? leveledFrom;
@@ -230,6 +296,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _introTimer?.cancel();
     widget.args.socket.clearListeners();
     widget.args.socket.disconnect();
     super.dispose();
@@ -238,6 +305,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    if (_showIntro) return _buildIntroScreen(l10n);
     if (_showResult) return _buildResultScreen(l10n);
 
     final q = _questions[_currentQ];
@@ -249,7 +317,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.gradientBackground),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
@@ -303,8 +371,9 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   }
 
   Widget _buildScoreRow(AppLocalizations l10n) {
+    final myCustomization = ref.watch(profileCustomizationProvider);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: AppColors.gradientCard,
         borderRadius: BorderRadius.circular(16),
@@ -315,9 +384,18 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
           Expanded(
             child: Column(
               children: [
-                Text(widget.args.username, style: AppTextStyles.bodySmall.copyWith(color: AppColors.primaryLight), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ProfileAvatar(
+                  username: widget.args.username,
+                  customization: myCustomization,
+                  size: 40,
+                ),
                 const SizedBox(height: 4),
-                Text('$_myScore', style: AppTextStyles.headlineLarge.copyWith(color: AppColors.primary)),
+                Text(widget.args.username,
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.primaryLight),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text('$_myScore',
+                    style: AppTextStyles.headlineLarge.copyWith(color: AppColors.primary)),
               ],
             ),
           ),
@@ -333,9 +411,18 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
           Expanded(
             child: Column(
               children: [
-                Text(widget.args.opponentName, style: AppTextStyles.bodySmall.copyWith(color: AppColors.error), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ProfileAvatar(
+                  username: widget.args.opponentName,
+                  customization: widget.args.opponentCustomization,
+                  size: 40,
+                ),
                 const SizedBox(height: 4),
-                Text('$_opponentScore', style: AppTextStyles.headlineLarge.copyWith(color: AppColors.error)),
+                Text(widget.args.opponentName,
+                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text('$_opponentScore',
+                    style: AppTextStyles.headlineLarge.copyWith(color: AppColors.error)),
               ],
             ),
           ),
@@ -368,7 +455,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('👤', style: const TextStyle(fontSize: 16)),
+          const Icon(Icons.person_rounded, size: 16, color: AppColors.textSecondary),
           const SizedBox(width: 8),
           Text(
             _opponentAnswered ? '${widget.args.opponentName} ${l10n.opponentAnswered}' : '${widget.args.opponentName} ${l10n.opponentThinking}',
@@ -382,18 +469,30 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   }
 
   Widget _buildOption(int index, String text, String label, Color labelColor) {
+    final correct = _questions[_currentQ].correct;
     Color bg = AppColors.surfaceLight;
     Color border = const Color(0xFF2A2A40);
-    if (_answered) {
-      final correct = _questions[_currentQ].correct;
+    Widget? badge;
+
+    // Sual mərhələsində: yalnız mənim seçimimi göstər (sönük), rəqibinki gizli
+    if (!_revealing) {
+      if (_answered && index == _myAnswer) {
+        bg = AppColors.primary.withValues(alpha: 0.15);
+        border = AppColors.primary;
+      }
+    } else {
+      // Reveal mərhələsi: doğru = yaşıl, mənim/rəqibin yanlış seçimi = qırmızı
       if (index == correct) {
         bg = AppColors.correctAnswer.withValues(alpha: 0.25);
         border = AppColors.correctAnswer;
-      } else if (index == _myAnswer) {
+      } else if (index == _myAnswer || index == _opponentAnswer) {
         bg = AppColors.wrongAnswer.withValues(alpha: 0.25);
         border = AppColors.wrongAnswer;
       }
+      // İkonlar — kimin seçimi olduğunu göstər
+      badge = _buildSelectionBadge(index);
     }
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: GestureDetector(
@@ -416,10 +515,44 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(child: Text(text, style: AppTextStyles.optionText)),
+              if (badge != null) badge,
             ],
           ),
         ),
       ),
+    );
+  }
+
+  /// Reveal mərhələsində — bu option-u kim seçib (mən, rəqib və ya hər ikisi)?
+  Widget? _buildSelectionBadge(int index) {
+    final mineHere = _myAnswer == index;
+    final oppHere = _opponentAnswer == index;
+    if (!mineHere && !oppHere) return null;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (mineHere)
+          Container(
+            margin: const EdgeInsets.only(left: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('SİZ', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+          ),
+        if (oppHere)
+          Container(
+            margin: const EdgeInsets.only(left: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.error,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text('RƏQİB', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+          ),
+      ],
     );
   }
 
@@ -438,14 +571,15 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.gradientBackground),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  isDraw ? '🤝' : (isWin ? '🏆' : '💔'),
-                  style: const TextStyle(fontSize: 84),
+                Icon(
+                  isDraw ? Icons.handshake_rounded : (isWin ? Icons.emoji_events_rounded : Icons.heart_broken_rounded),
+                  size: 96,
+                  color: isDraw ? AppColors.accent : (isWin ? AppColors.gold : AppColors.error),
                 ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
                 const SizedBox(height: 16),
                 Text(
@@ -492,7 +626,9 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
                     _badge(l10n.coinsEarned(coins), AppColors.gold),
                   ],
                 ).animate().fadeIn(delay: 600.ms),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
+                _buildFriendRequestButton(l10n).animate().fadeIn(delay: 650.ms),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 52,
@@ -517,6 +653,191 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroScreen(AppLocalizations l10n) {
+    final myCustomization = ref.watch(profileCustomizationProvider);
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(gradient: AppColors.gradientBackground),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  l10n.battleStartingTitle,
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted, letterSpacing: 3),
+                ).animate().fadeIn(duration: 400.ms),
+                const SizedBox(height: 28),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: _buildIntroPlayer(
+                        widget.args.username,
+                        myCustomization,
+                        AppColors.primary,
+                      ).animate().slideX(begin: -1.0, duration: 600.ms, curve: Curves.easeOut).fadeIn(),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentOrange.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.accentOrange, width: 2),
+                      ),
+                      child: Text(
+                        'VS',
+                        style: AppTextStyles.headlineLarge.copyWith(color: AppColors.accentOrange),
+                      ),
+                    ).animate().scale(delay: 400.ms, duration: 500.ms, curve: Curves.elasticOut),
+                    Expanded(
+                      child: _buildIntroPlayer(
+                        widget.args.opponentName,
+                        widget.args.opponentCustomization,
+                        AppColors.error,
+                      ).animate().slideX(begin: 1.0, duration: 600.ms, curve: Curves.easeOut).fadeIn(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 60),
+                Text(
+                  l10n.battleWord,
+                  style: AppTextStyles.headlineLarge.copyWith(
+                    color: AppColors.accentOrange,
+                    fontSize: 56,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 8,
+                  ),
+                )
+                    .animate()
+                    .fadeIn(delay: 1000.ms, duration: 400.ms)
+                    .scale(begin: const Offset(0.5, 0.5), duration: 600.ms, curve: Curves.elasticOut)
+                    .then(delay: 600.ms)
+                    .shake(hz: 4, duration: 600.ms),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIntroPlayer(
+    String name,
+    ProfileCustomization customization,
+    Color nameColor,
+  ) {
+    return Column(
+      children: [
+        ProfileAvatar(
+          username: name,
+          customization: customization,
+          size: 84,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          name,
+          style: AppTextStyles.titleMedium.copyWith(color: nameColor, fontWeight: FontWeight.w700),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _sendFriendRequest(AppLocalizations l10n) async {
+    if (_friendRequestSent || _friendRequestLoading) return;
+    final code = widget.args.opponentFriendCode;
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorGeneric), backgroundColor: AppColors.error),
+      );
+      return;
+    }
+    setState(() {
+      _friendRequestLoading = true;
+    });
+    try {
+      await ref.read(friendsProvider.notifier).sendRequest(code);
+      if (!mounted) return;
+      setState(() {
+        _friendRequestSent = true;
+        _friendRequestLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.friendRequestSent), backgroundColor: AppColors.success),
+      );
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final code = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null) as String?;
+      String msg;
+      bool treatAsSuccess = false;
+      switch (code) {
+        case 'already_friends':
+          msg = l10n.errorAlreadyFriends;
+          treatAsSuccess = true;
+          break;
+        case 'already_pending':
+          msg = l10n.errorAlreadyPending;
+          treatAsSuccess = true;
+          break;
+        case 'cannot_friend_self':
+          msg = l10n.errorCannotFriendSelf;
+          break;
+        case 'user_not_found':
+          msg = l10n.errorUserNotFound;
+          break;
+        case 'blocked':
+          msg = l10n.errorBlocked;
+          break;
+        default:
+          msg = l10n.errorGeneric;
+      }
+      setState(() {
+        _friendRequestLoading = false;
+        if (treatAsSuccess) _friendRequestSent = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: treatAsSuccess ? AppColors.accent : AppColors.error),
+      );
+    }
+  }
+
+  Widget _buildFriendRequestButton(AppLocalizations l10n) {
+    final disabled = widget.args.opponentFriendCode.isEmpty;
+    final label = _friendRequestSent ? l10n.friendRequestSentLabel : l10n.sendFriendRequestLabel;
+    final icon = _friendRequestSent ? Icons.check_rounded : Icons.person_add_alt_1_rounded;
+    final bg = _friendRequestSent
+        ? AppColors.success.withValues(alpha: 0.15)
+        : AppColors.primary.withValues(alpha: 0.15);
+    final fg = _friendRequestSent ? AppColors.success : AppColors.primary;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: OutlinedButton.icon(
+        onPressed: (disabled || _friendRequestSent || _friendRequestLoading)
+            ? null
+            : () => _sendFriendRequest(l10n),
+        icon: _friendRequestLoading
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+              )
+            : Icon(icon, color: fg, size: 18),
+        label: Text(label, style: AppTextStyles.labelLarge.copyWith(color: fg, fontSize: 14)),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: bg,
+          side: BorderSide(color: fg.withValues(alpha: 0.5)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );

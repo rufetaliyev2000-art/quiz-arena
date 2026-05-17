@@ -18,20 +18,31 @@ class AuthState {
   final AuthStatus status;
   final String? username;
   final AuthErrorCode errorCode;
+  /// Backend 403 device_mismatch qaytarıbsa true. Router bunu görüb
+  /// `/claim-device` ekranına yönləndirir. OTP claim uğurla bitəndə
+  /// `clearDeviceMismatch()` ilə təmizlənir.
+  final bool deviceMismatch;
 
   const AuthState({
     this.status = AuthStatus.unknown,
     this.username,
     this.errorCode = AuthErrorCode.none,
+    this.deviceMismatch = false,
   });
 
   String? get errorMessage => errorCode == AuthErrorCode.none ? null : errorCode.name;
 
-  AuthState copyWith({AuthStatus? status, String? username, AuthErrorCode? errorCode}) {
+  AuthState copyWith({
+    AuthStatus? status,
+    String? username,
+    AuthErrorCode? errorCode,
+    bool? deviceMismatch,
+  }) {
     return AuthState(
       status: status ?? this.status,
       username: username ?? this.username,
       errorCode: errorCode ?? AuthErrorCode.none,
+      deviceMismatch: deviceMismatch ?? this.deviceMismatch,
     );
   }
 }
@@ -40,8 +51,34 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
   @override
   Future<AuthState> build() async {
     final repo = ref.watch(authRepositoryProvider);
-    // İlk açılışda Supabase session-u oxu
+
+    // Supabase session expire/refresh-fail edəndə avtomatik unauthenticated et —
+    // əks halda splash köhnə session-a güvənib home-a yönləndirir və profile boş gəlir.
+    final sub = sb.Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == sb.AuthChangeEvent.signedOut) {
+        state = const AsyncData(AuthState(status: AuthStatus.unauthenticated));
+      } else if (event == sb.AuthChangeEvent.signedIn ||
+          event == sb.AuthChangeEvent.tokenRefreshed) {
+        final user = data.session?.user;
+        if (user != null) {
+          state = AsyncData(AuthState(
+            status: AuthStatus.authenticated,
+            username: (user.userMetadata?['username'] as String?) ?? user.email,
+          ));
+        }
+      }
+    });
+    ref.onDispose(sub.cancel);
+
     final user = repo.currentUser;
+    final session = sb.Supabase.instance.client.auth.currentSession;
+    // currentUser var, lakin session-da refresh token yoxdursa — sahib olmayan
+    // state; bu halda unauthenticated qaytar ki, splash login-ə yönləndirsin.
+    if (user != null && session?.refreshToken == null) {
+      try { await repo.signOut(); } catch (_) {}
+      return const AuthState(status: AuthStatus.unauthenticated);
+    }
     return AuthState(
       status: user != null ? AuthStatus.authenticated : AuthStatus.unauthenticated,
       username: (user?.userMetadata?['username'] as String?) ?? user?.email,
@@ -99,6 +136,22 @@ class AuthNotifier extends AsyncNotifier<AuthState> {
     try { await FacebookAuth.instance.logOut(); } catch (_) {}
     await repo.signOut();
     state = const AsyncData(AuthState(status: AuthStatus.unauthenticated));
+  }
+
+  /// Dio interceptor 403 `device_mismatch` görəndə çağırır. State-də flag
+  /// qaldırılır; router bunu listen edib `/claim-device` ekranına aparır.
+  void markDeviceMismatch() {
+    final cur = state.value ?? const AuthState();
+    if (cur.deviceMismatch) return;
+    state = AsyncData(cur.copyWith(deviceMismatch: true));
+  }
+
+  /// OTP claim uğurla bitirildi — bayrağı sıfırla ki, splash yenidən normal
+  /// yönləndirsin.
+  void clearDeviceMismatch() {
+    final cur = state.value ?? const AuthState();
+    if (!cur.deviceMismatch) return;
+    state = AsyncData(cur.copyWith(deviceMismatch: false));
   }
 
   /// Native Google sign-in: google_sign_in plugin idToken alır,

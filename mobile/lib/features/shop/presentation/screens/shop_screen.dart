@@ -30,8 +30,17 @@ class ShopScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(l10n.shopTitle, style: AppTextStyles.headlineLarge).animate().fadeIn(),
+                  Expanded(
+                    child: Text(
+                      l10n.shopTitle,
+                      style: AppTextStyles.headlineLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ).animate().fadeIn(),
+                  ),
+                  const SizedBox(width: 8),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       _currencyChip(Icons.monetization_on, coinsText, AppColors.gold),
                       const SizedBox(width: 8),
@@ -106,7 +115,7 @@ class ShopScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const Text('🎁', style: TextStyle(fontSize: 48)),
+          const Icon(Icons.card_giftcard_rounded, size: 56, color: Colors.black87),
           const SizedBox(width: 16),
           Expanded(
             child: Column(

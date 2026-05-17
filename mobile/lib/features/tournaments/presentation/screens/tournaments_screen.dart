@@ -10,11 +10,11 @@ class TournamentsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final tournaments = [
-      (l10n.dailyChampionship, '🏆', 'Starts in 02:45', 256, 5000, AppColors.gradientTournament, true),
-      (l10n.weekendRoyale, '👑', 'Starts in 1d 08h', 512, 15000, AppColors.gradientBattleRoyale, false),
-      (l10n.speedQuizBlitz, '⚡', l10n.liveFilter, 128, 3000, AppColors.gradientPrimary, true),
-      (l10n.knowledgeMasters, '🧠', 'Starts in 3d 12h', 64, 8000, AppColors.gradientCyan, false),
+    final tournaments = <(String, IconData, String, int, int, LinearGradient, bool)>[
+      (l10n.dailyChampionship, Icons.emoji_events_rounded, 'Starts in 02:45', 256, 5000, AppColors.gradientTournament, true),
+      (l10n.weekendRoyale, Icons.workspace_premium_rounded, 'Starts in 1d 08h', 512, 15000, AppColors.gradientBattleRoyale, false),
+      (l10n.speedQuizBlitz, Icons.flash_on_rounded, l10n.liveFilter, 128, 3000, AppColors.gradientPrimary, true),
+      (l10n.knowledgeMasters, Icons.psychology_rounded, 'Starts in 3d 12h', 64, 8000, AppColors.gradientCyan, false),
     ];
 
     return Scaffold(
@@ -62,8 +62,8 @@ class TournamentsScreen extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: tournaments.length,
                 itemBuilder: (_, i) {
-                  final (name, emoji, time, players, prize, gradient, live) = tournaments[i];
-                  return _buildTournamentCard(l10n, name, emoji, time, players, prize, gradient, live, i);
+                  final (name, icon, time, players, prize, gradient, live) = tournaments[i];
+                  return _buildTournamentCard(l10n, name, icon, time, players, prize, gradient, live, i);
                 },
               ),
             ),
@@ -73,7 +73,7 @@ class TournamentsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTournamentCard(AppLocalizations l10n, String name, String emoji, String time, int players, int prize, LinearGradient gradient, bool live, int index) {
+  Widget _buildTournamentCard(AppLocalizations l10n, String name, IconData icon, String time, int players, int prize, LinearGradient gradient, bool live, int index) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
@@ -108,7 +108,7 @@ class TournamentsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                Center(child: Text(emoji, style: const TextStyle(fontSize: 44))),
+                Center(child: Icon(icon, size: 50, color: Colors.white)),
               ],
             ),
           ),
@@ -126,11 +126,11 @@ class TournamentsScreen extends StatelessWidget {
                         children: [
                           const Icon(Icons.access_time, color: AppColors.textMuted, size: 13),
                           const SizedBox(width: 4),
-                          Text(time, style: AppTextStyles.bodySmall),
+                          Flexible(child: Text(time, style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
                           const SizedBox(width: 12),
                           const Icon(Icons.people_outline, color: AppColors.textMuted, size: 13),
                           const SizedBox(width: 4),
-                          Text(l10n.playersCount(players), style: AppTextStyles.bodySmall),
+                          Flexible(child: Text(l10n.playersCount(players), style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis)),
                         ],
                       ),
                       const SizedBox(height: 6),

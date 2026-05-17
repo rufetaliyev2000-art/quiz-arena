@@ -3,9 +3,10 @@ import {
 } from '@nestjs/common';
 import { FriendsService } from './friends.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DeviceGuard } from '../auth/guards/device.guard';
 
 @Controller('friends')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, DeviceGuard)
 export class FriendsController {
   constructor(private friends: FriendsService) {}
 

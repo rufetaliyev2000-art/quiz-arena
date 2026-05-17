@@ -48,12 +48,20 @@ class BattleSocketService {
     _socket = null;
   }
 
-  void joinQueue({required String userId, required String username, required int elo}) {
+  void joinQueue({
+    required String userId,
+    required String username,
+    required int elo,
+    String friendCode = '',
+    Map<String, dynamic>? customization,
+  }) {
     debugPrint('[ws] match:join → user=$username (id=${userId.substring(0, 8)}, elo=$elo)');
     _socket?.emit('match:join', {
       'userId': userId,
       'username': username,
       'elo': elo,
+      'friendCode': friendCode,
+      if (customization != null) 'customization': customization,
     });
   }
 

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Request, HttpCode, Headers } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SocialAuthService } from './social-auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -46,6 +46,60 @@ export class AuthController {
   @HttpCode(200)
   logout(@Request() req) {
     return this.authService.logout(req.user.id);
+  }
+
+  // ──────── Sign-up OTP gate ────────
+
+  @UseGuards(JwtAuthGuard)
+  @Post('send-signup-otp')
+  @HttpCode(200)
+  sendSignupOtp(@Request() req) {
+    return this.authService.sendSignupOtp(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('verify-signup-otp')
+  @HttpCode(200)
+  verifySignupOtp(
+    @Request() req,
+    @Body() body: { code: string; deviceId: string; deviceLabel?: string },
+  ) {
+    return this.authService.verifySignupOtp(
+      req.user.id,
+      body.code,
+      body.deviceId,
+      body.deviceLabel,
+    );
+  }
+
+  // ──────── Device claim flow ────────
+
+  @UseGuards(JwtAuthGuard)
+  @Get('device-status')
+  getDeviceStatus(@Request() req, @Headers('x-device-id') deviceId?: string) {
+    return this.authService.getDeviceStatus(req.user.id, (deviceId ?? '').trim());
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('send-device-otp')
+  @HttpCode(200)
+  sendDeviceOtp(@Request() req) {
+    return this.authService.sendDeviceOtp(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('claim-device')
+  @HttpCode(200)
+  claimDevice(
+    @Request() req,
+    @Body() body: { code: string; deviceId: string; deviceLabel?: string },
+  ) {
+    return this.authService.claimDevice(
+      req.user.id,
+      body.code,
+      body.deviceId,
+      body.deviceLabel,
+    );
   }
 
   // ───────── Social login (single endpoint per provider) ─────────

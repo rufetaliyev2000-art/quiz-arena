@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/auth/presentation/screens/username_setup_screen.dart';
+import '../../features/auth/presentation/screens/signup_otp_screen.dart';
+import '../../features/auth/presentation/screens/claim_device_screen.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/quiz/presentation/screens/solo_quiz_screen.dart';
 import '../../features/battle/presentation/screens/battle_screen.dart';
@@ -22,30 +23,39 @@ import '../../features/auth/providers/auth_provider.dart';
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
-  return GoRouter(
+  final router = GoRouter(
     navigatorKey: _rootNavigatorKey,
     initialLocation: '/splash',
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      final isAuthenticated = authState.whenOrNull(
-        data: (s) => s.status == AuthStatus.authenticated,
-      );
+      final s = authState.value;
+      final isAuthenticated = s?.status == AuthStatus.authenticated;
+      final deviceMismatch = s?.deviceMismatch ?? false;
       final isLoading = authState.isLoading;
       final path = state.matchedLocation;
 
       if (isLoading) return null;
 
-      final publicPaths = ['/splash', '/login', '/register'];
-      // /setup-username authenticated-only-dir, amma onsuz da publicPaths-da
-      // olmadığı üçün unauthenticated halda /login-ə düşür.
-      if (isAuthenticated == true && publicPaths.contains(path)) return '/home';
-      if (isAuthenticated == false && !publicPaths.contains(path)) return '/login';
+      final publicPaths = ['/splash', '/login'];
+
+      // Authenticated-də cihaz uyğunsuzluğu varsa yalnız /claim-device-ə icazə.
+      if (isAuthenticated && deviceMismatch && path != '/claim-device') {
+        return '/claim-device';
+      }
+      // Uyğunsuzluq aradan qalxıbsa amma istifadəçi hələ də /claim-device-dədirsə
+      // splash-ə qaytar ki, sıralı yönləndirmə yenidən qiymətləndirilsin.
+      if (isAuthenticated && !deviceMismatch && path == '/claim-device') {
+        return '/splash';
+      }
+      if (isAuthenticated && publicPaths.contains(path)) return '/home';
+      if (!isAuthenticated && !publicPaths.contains(path)) return '/login';
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+      GoRoute(path: '/signup-otp', builder: (_, __) => const SignupOtpScreen()),
+      GoRoute(path: '/claim-device', builder: (_, __) => const ClaimDeviceScreen()),
       GoRoute(path: '/setup-username', builder: (_, __) => const UsernameSetupScreen()),
       GoRoute(parentNavigatorKey: _rootNavigatorKey, path: '/quiz', builder: (_, __) => const SoloQuizScreen()),
       GoRoute(parentNavigatorKey: _rootNavigatorKey, path: '/battle', builder: (_, __) => const BattleScreen()),
@@ -63,6 +73,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
   );
+
+  // Auth state dəyişdikdə (məs. /users/me 401 → signOut) router-i yenidən
+  // qiymətləndir ki, qorunan ekranlardan login-ə yönləndirsin.
+  ref.listen(authProvider, (_, __) {
+    router.refresh();
+  });
+
+  return router;
 });
 
 class MainShell extends StatelessWidget {

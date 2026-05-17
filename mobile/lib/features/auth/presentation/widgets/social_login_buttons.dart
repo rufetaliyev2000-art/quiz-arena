@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,8 +8,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../providers/auth_provider.dart';
 
-/// 3 sosial giriÅŸin paylaÅŸÄ±lan widget-i. Login + Register ekranlarÄ±nda istifadÉ™ olunur.
-/// Ä°stifadÉ™Ã§i dÃ¼ymÉ™ni basanda mÃ¼vafiq provider axÄ±nÄ± baÅŸlayÄ±r, uÄŸurda /home-a yÃ¶nlÉ™ndirir.
+/// Sosial girişin paylaşılan widget-i (Google + Facebook).
+/// İstifadəçi düyməni basanda müvafiq provider axını başlayır, uğurda /home-a yönləndirir.
 class SocialLoginButtons extends ConsumerStatefulWidget {
   final String? googleServerClientId;
   const SocialLoginButtons({super.key, this.googleServerClientId});
@@ -52,19 +50,9 @@ class _SocialLoginButtonsState extends ConsumerState<SocialLoginButtons> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    final appleAvailable = Platform.isIOS || Platform.isMacOS;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(children: [
-          const Expanded(child: Divider(color: AppColors.surfaceLight)),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(l10n.orContinueWith, style: AppTextStyles.bodySmall),
-          ),
-          const Expanded(child: Divider(color: AppColors.surfaceLight)),
-        ]),
-        const SizedBox(height: 16),
         _Button(
           icon: Icons.g_mobiledata_rounded,
           iconColor: Colors.white,
@@ -76,7 +64,7 @@ class _SocialLoginButtonsState extends ConsumerState<SocialLoginButtons> {
               .read(authProvider.notifier)
               .signInWithGoogle(serverClientId: widget.googleServerClientId)),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _Button(
           icon: Icons.facebook_rounded,
           iconColor: Colors.white,
@@ -85,17 +73,6 @@ class _SocialLoginButtonsState extends ConsumerState<SocialLoginButtons> {
           busy: _busy,
           onTap: () => _run(() => ref.read(authProvider.notifier).signInWithFacebook()),
         ),
-        if (appleAvailable) ...[
-          const SizedBox(height: 10),
-          _Button(
-            icon: Icons.apple_rounded,
-            iconColor: Colors.white,
-            background: Colors.black,
-            label: l10n.continueWithApple,
-            busy: _busy,
-            onTap: () => _run(() => ref.read(authProvider.notifier).signInWithApple()),
-          ),
-        ],
       ],
     );
   }

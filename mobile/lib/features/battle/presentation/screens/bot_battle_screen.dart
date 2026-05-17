@@ -119,7 +119,7 @@ class _BotBattleScreenState extends ConsumerState<BotBattleScreen> with TickerPr
     if (isCorrect) {
       final missions = ref.read(dailyMissionsProvider.notifier);
       missions.incrementProgress(MissionType.answerCorrect, 1);
-      // 5 san É™rzindÉ™: keÃ§É™n vaxt < 5 â†’ _timeLeft > 10
+      // 5 san ərzində: keçən vaxt < 5 → _timeLeft > 10
       if (_timeLeft > _totalTime - 5) {
         missions.incrementProgress(MissionType.fastAnswer, 1);
       }
@@ -238,7 +238,7 @@ class _BotBattleScreenState extends ConsumerState<BotBattleScreen> with TickerPr
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.gradientBackground),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
@@ -365,7 +365,7 @@ class _BotBattleScreenState extends ConsumerState<BotBattleScreen> with TickerPr
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('ðŸ¤–', style: TextStyle(fontSize: 16)),
+          const Text('??', style: TextStyle(fontSize: 16)),
           const SizedBox(width: 8),
           Text(
             _botAnswered ? l10n.botAnswered : l10n.botThinking,
@@ -436,7 +436,7 @@ class _BotBattleScreenState extends ConsumerState<BotBattleScreen> with TickerPr
                 const Icon(Icons.cancel, color: AppColors.wrongAnswer, size: 18),
               if (isBotChoice && _answered) ...[
                 const SizedBox(width: 4),
-                const Text('ðŸ¤–', style: TextStyle(fontSize: 14)),
+                const Text('??', style: TextStyle(fontSize: 14)),
               ],
             ],
           ),
@@ -460,13 +460,13 @@ class _BotBattleScreenState extends ConsumerState<BotBattleScreen> with TickerPr
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.gradientBackground),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  isWin ? 'ðŸ†' : (isDraw ? 'ðŸ¤' : 'ðŸ¤–'),
+                  isWin ? '🏆' : (isDraw ? '🤝' : '??'),
                   style: const TextStyle(fontSize: 72),
                 ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
                 const SizedBox(height: 16),

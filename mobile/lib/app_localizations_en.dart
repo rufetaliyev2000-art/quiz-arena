@@ -723,28 +723,28 @@ class AppLocalizationsEn extends AppLocalizations {
   String get botThinking => 'Bot is thinking...';
 
   @override
-  String get botAnswered => 'Bot answered ✓';
+  String get botAnswered => 'Bot answered';
 
   @override
-  String get youWon => 'You Won! 🎉';
+  String get youWon => 'You Won!';
 
   @override
-  String get botWon => 'Bot Won 🤖';
+  String get botWon => 'Bot Won';
 
   @override
   String get opponentThinking => 'is thinking...';
 
   @override
-  String get opponentAnswered => 'answered ✓';
+  String get opponentAnswered => 'answered';
 
   @override
   String get opponentWon => 'Opponent Won';
 
   @override
-  String get youLost => 'You Lost 💔';
+  String get youLost => 'You Lost';
 
   @override
-  String get drawResult => 'It\'s a Draw! 🤝';
+  String get drawResult => 'It\'s a Draw!';
 
   @override
   String get yourScore => 'Your Score';
@@ -804,4 +804,115 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get connectionLostMessage => 'Connection lost';
+
+  @override
+  String get battleStartingTitle => 'BATTLE STARTING';
+
+  @override
+  String get battleWord => 'BATTLE!';
+
+  @override
+  String get sendFriendRequestLabel => 'Send friend request';
+
+  @override
+  String get friendRequestSentLabel => 'Request sent';
+
+  @override
+  String get matchHistoryEmpty => 'No match history yet';
+
+  @override
+  String get matchHistoryError => 'Could not load history';
+
+  @override
+  String get matchOutcomeWin => 'WIN';
+
+  @override
+  String get matchOutcomeLoss => 'LOSS';
+
+  @override
+  String get matchOutcomeDraw => 'DRAW';
+
+  @override
+  String get matchOutcomeSolo => 'SOLO';
+
+  @override
+  String get matchType1v1 => '1v1';
+
+  @override
+  String get matchTypeTournament => 'Tournament';
+
+  @override
+  String get matchTypeSolo => 'Solo';
+
+  @override
+  String get editProfileTitle => 'Edit Profile';
+
+  @override
+  String get chooseAvatar => 'Choose avatar';
+
+  @override
+  String get chooseFrame => 'Frame';
+
+  @override
+  String get chooseColor => 'Color';
+
+  @override
+  String get useInitialLetter => 'Initial';
+
+  @override
+  String get saveAction => 'Save';
+
+  @override
+  String get profileUpdated => 'Profile updated';
+
+  @override
+  String get editProfileTooltip => 'Edit profile';
+
+  @override
+  String get usernameAvailable => 'Username is available';
+
+  @override
+  String get signupOtpTitle => 'Verify your email';
+
+  @override
+  String get signupOtpSubtitle => 'Enter the 6-digit code sent to your email';
+
+  @override
+  String get signupOtpVerify => 'VERIFY';
+
+  @override
+  String get signupOtpResend => 'Resend code';
+
+  @override
+  String signupOtpResendIn(int seconds) {
+    return 'Resend in ${seconds}s';
+  }
+
+  @override
+  String get signupOtpInvalid => 'Invalid or expired code';
+
+  @override
+  String get signupOtpSent => 'Code sent to your email';
+
+  @override
+  String get otpCodeLength => 'Enter all 6 digits';
+
+  @override
+  String get claimDeviceTitle => 'Claim this device';
+
+  @override
+  String get claimDeviceSubtitle =>
+      'Your account is active on another device. Enter the code sent to your email to claim this device.';
+
+  @override
+  String get claimDeviceContinue => 'CLAIM THIS DEVICE';
+
+  @override
+  String get claimDeviceLogout => 'Sign out';
+
+  @override
+  String get claimDeviceSuccess => 'Device claimed';
+
+  @override
+  String get claimDeviceActiveLabel => 'Currently active';
 }

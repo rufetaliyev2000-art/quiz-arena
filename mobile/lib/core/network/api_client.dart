@@ -1,12 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../providers/device_id_provider.dart';
 import 'api_endpoints.dart';
 
 class ApiClient {
   ApiClient._();
 
-  static Dio create(SupabaseClient supabase) {
+  static Dio create(
+    SupabaseClient supabase,
+    DeviceIdService deviceIdService, {
+    required VoidCallback onDeviceMismatch,
+  }) {
     final dio = Dio(BaseOptions(
       baseUrl: ApiEndpoints.baseUrl,
       connectTimeout: const Duration(seconds: 10),
@@ -14,17 +19,26 @@ class ApiClient {
       headers: {'Content-Type': 'application/json'},
     ));
 
-    dio.interceptors.add(_SupabaseAuthInterceptor(supabase));
+    dio.interceptors.add(_AuthAndDeviceInterceptor(
+      supabase,
+      deviceIdService,
+      onDeviceMismatch: onDeviceMismatch,
+    ));
     return dio;
   }
 }
 
-/// Hər HTTP sorğusuna cari Supabase JWT-ni `Authorization` başlığı kimi qoşur.
-/// Token müddəti bitsə Supabase SDK avtomatik refresh edir — burada əlavə iş lazım deyil.
-class _SupabaseAuthInterceptor extends QueuedInterceptorsWrapper {
+/// Hər HTTP sorğusuna:
+///  - cari Supabase JWT-ni `Authorization` başlığı kimi
+///  - cari deviceId-ni `X-Device-Id` başlığı kimi qoşur.
+/// 403 + `code: 'device_mismatch'` halında `onDeviceMismatch` çağrılır
+/// (router-i /claim-device-ə yönləndirmək üçün).
+class _AuthAndDeviceInterceptor extends QueuedInterceptorsWrapper {
   final SupabaseClient _supabase;
+  final DeviceIdService _deviceIdService;
+  final VoidCallback onDeviceMismatch;
 
-  _SupabaseAuthInterceptor(this._supabase);
+  _AuthAndDeviceInterceptor(this._supabase, this._deviceIdService, {required this.onDeviceMismatch});
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -32,6 +46,8 @@ class _SupabaseAuthInterceptor extends QueuedInterceptorsWrapper {
     if (token != null) {
       options.headers['Authorization'] = 'Bearer $token';
     }
+    final deviceId = await _deviceIdService.get();
+    options.headers['X-Device-Id'] = deviceId;
     debugPrint('[http] → ${options.method} ${options.path}');
     handler.next(options);
   }
@@ -45,6 +61,24 @@ class _SupabaseAuthInterceptor extends QueuedInterceptorsWrapper {
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     debugPrint('[http] ✗ ${err.response?.statusCode} ${err.requestOptions.path}: ${err.response?.data}');
+
+    // 403 device_mismatch — başqa cihazda hesab aktivdir.
+    if (err.response?.statusCode == 403) {
+      final data = err.response?.data;
+      String? code;
+      if (data is Map) {
+        final inner = data['message'];
+        if (inner is Map) code = inner['code'] as String?;
+        code ??= data['code'] as String?;
+      }
+      if (code == 'device_mismatch') {
+        debugPrint('[http] device_mismatch — redirecting to /claim-device');
+        onDeviceMismatch();
+        handler.next(err);
+        return;
+      }
+    }
+
     if (err.response?.statusCode == 401) {
       try {
         await _supabase.auth.refreshSession();

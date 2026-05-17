@@ -88,7 +88,7 @@ class LeaderboardScreen extends ConsumerWidget {
   Widget _buildShortTop(List<LeaderboardEntry> players) {
     return Column(
       children: players.asMap().entries.map((e) {
-        final medal = e.key == 0 ? 'ðŸ¥‡' : (e.key == 1 ? 'ðŸ¥ˆ' : 'ðŸ¥‰');
+        final medal = e.key == 0 ? '🥇' : (e.key == 1 ? '🥈' : '🥉');
         final color = e.key == 0
             ? AppColors.rankGold
             : (e.key == 1 ? AppColors.rankSilver : AppColors.rankBronze);
@@ -114,11 +114,11 @@ class LeaderboardScreen extends ConsumerWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          _buildPodium(players[1].username, players[1].elo, 'ðŸ¥ˆ', 110, AppColors.rankSilver),
+          _buildPodium(players[1].username, players[1].elo, '🥈', 110, AppColors.rankSilver),
           const SizedBox(width: 8),
-          _buildPodium(players[0].username, players[0].elo, 'ðŸ¥‡', 150, AppColors.rankGold),
+          _buildPodium(players[0].username, players[0].elo, '🥇', 150, AppColors.rankGold),
           const SizedBox(width: 8),
-          _buildPodium(players[2].username, players[2].elo, 'ðŸ¥‰', 90, AppColors.rankBronze),
+          _buildPodium(players[2].username, players[2].elo, '🥉', 90, AppColors.rankBronze),
         ],
       ),
     ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2);

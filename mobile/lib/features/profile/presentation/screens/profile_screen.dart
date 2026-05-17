@@ -10,6 +10,12 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/language_selector.dart';
 import '../../../home/data/user_repository.dart';
 import '../../../home/providers/user_provider.dart';
+import '../../data/match_history_repository.dart';
+import '../../providers/match_history_provider.dart';
+import '../../data/profile_customization.dart';
+import '../../providers/profile_customization_provider.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/profile_customization_sheet.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -19,6 +25,7 @@ class ProfileScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
     final profileAsync = ref.watch(userProfileProvider);
     final localStats = ref.watch(localGameStatsProvider);
+    final customization = ref.watch(profileCustomizationProvider);
 
     return Scaffold(
       body: Container(
@@ -38,12 +45,12 @@ class ProfileScreen extends ConsumerWidget {
               return SingleChildScrollView(
               child: Column(
                 children: [
-                  _buildHeader(context, ref, l10n, profile.username, effectiveLevel, totalXp, profile.elo, totalCoins),
+                  _buildHeader(context, ref, l10n, profile, customization, effectiveLevel, totalXp, totalCoins),
                   _buildStatsGrid(l10n, totalWins, totalLosses, totalXp, winRate),
                   const SizedBox(height: 20),
                   _buildAchievements(l10n),
                   const SizedBox(height: 20),
-                  _buildRecentMatches(l10n),
+                  _buildRecentMatches(context, ref, l10n),
                   const SizedBox(height: 20),
                   _buildSettings(context, ref, l10n),
                   const SizedBox(height: 30),
@@ -57,7 +64,19 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, WidgetRef ref, AppLocalizations l10n, String username, int level, int totalXp, int elo, int coins) {
+  Widget _buildHeader(
+    BuildContext context,
+    WidgetRef ref,
+    AppLocalizations l10n,
+    UserProfile profile,
+    ProfileCustomization customization,
+    int level,
+    int totalXp,
+    int coins,
+  ) {
+    final username = profile.username;
+    final elo = profile.elo;
+
     String rankLabel(int elo) {
       if (elo >= 2000) return l10n.rankDiamond;
       if (elo >= 1600) return l10n.rankPlatinum;
@@ -82,19 +101,35 @@ class ProfileScreen extends ConsumerWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  gradient: AppColors.gradientPrimary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: isMaxLevel ? AppColors.gold : AppColors.primary, width: 3),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.4), blurRadius: 20)],
-                ),
-                child: Center(
-                  child: Text(
-                    username[0].toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold),
+              ProfileAvatar(
+                username: username,
+                customization: customization,
+                size: 96,
+                isMaxLevel: isMaxLevel,
+              ),
+              Positioned(
+                top: -4,
+                right: -4,
+                child: GestureDetector(
+                  onTap: () => showProfileCustomizationSheet(context, ref, profile),
+                  child: Tooltip(
+                    message: l10n.editProfileTooltip,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary, width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.4),
+                              blurRadius: 8),
+                        ],
+                      ),
+                      child: const Icon(Icons.settings_rounded,
+                          color: AppColors.primaryLight, size: 18),
+                    ),
                   ),
                 ),
               ),
@@ -181,11 +216,19 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildHeaderStat(String value, String label, Color color) {
-    return Column(
-      children: [
-        Text(value, style: AppTextStyles.titleLarge.copyWith(color: color)),
-        Text(label, style: AppTextStyles.bodySmall),
-      ],
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: AppTextStyles.titleLarge.copyWith(color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+          ),
+          Text(label, style: AppTextStyles.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ],
+      ),
     );
   }
 
@@ -236,11 +279,11 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildAchievements(AppLocalizations l10n) {
-    final achievements = [
-      (l10n.achievementFirstWin, '🏆', true),
-      (l10n.achievementTenWins, '⚡', false),
-      (l10n.achievementSpeedDemon, '🚀', false),
-      (l10n.achievementFiftyWins, '👑', false),
+    final achievements = <(String, IconData, bool)>[
+      (l10n.achievementFirstWin, Icons.emoji_events_rounded, true),
+      (l10n.achievementTenWins, Icons.flash_on_rounded, false),
+      (l10n.achievementSpeedDemon, Icons.rocket_launch_rounded, false),
+      (l10n.achievementFiftyWins, Icons.workspace_premium_rounded, false),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -256,7 +299,7 @@ class ProfileScreen extends ConsumerWidget {
               itemCount: achievements.length,
               separatorBuilder: (_, __) => const SizedBox(width: 12),
               itemBuilder: (_, i) {
-                final (name, emoji, unlocked) = achievements[i];
+                final (name, icon, unlocked) = achievements[i];
                 return Container(
                   width: 78,
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -268,13 +311,10 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        emoji,
-                        style: TextStyle(
-                          fontSize: 24,
-                          color: unlocked ? null : Colors.transparent,
-                          shadows: unlocked ? null : const [Shadow(color: Colors.grey, blurRadius: 0)],
-                        ),
+                      Icon(
+                        icon,
+                        size: 28,
+                        color: unlocked ? AppColors.accent : AppColors.textMuted.withValues(alpha: 0.4),
                       ),
                       const SizedBox(height: 4),
                       Flexible(
@@ -300,7 +340,8 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentMatches(AppLocalizations l10n) {
+  Widget _buildRecentMatches(BuildContext context, WidgetRef ref, AppLocalizations l10n) {
+    final historyAsync = ref.watch(matchHistoryProvider);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -308,19 +349,119 @@ class ProfileScreen extends ConsumerWidget {
         children: [
           Text(l10n.recentMatchesTitle, style: AppTextStyles.titleLarge),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.card,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2A2A40)),
+          historyAsync.when(
+            loading: () => Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF2A2A40)),
+              ),
+              child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
             ),
-            child: Center(
-              child: Text(l10n.matchHistorySoon, style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted)),
-            ),
+            error: (_, __) => _emptyHistoryCard(l10n, isError: true),
+            data: (matches) {
+              if (matches.isEmpty) return _emptyHistoryCard(l10n);
+              return Column(
+                children: matches.take(10).map((m) => _matchHistoryRow(l10n, m)).toList(),
+              );
+            },
           ),
         ],
       ).animate().fadeIn(delay: 500.ms),
+    );
+  }
+
+  Widget _emptyHistoryCard(AppLocalizations l10n, {bool isError = false}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF2A2A40)),
+      ),
+      child: Center(
+        child: Text(
+          isError ? l10n.matchHistoryError : l10n.matchHistoryEmpty,
+          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _matchHistoryRow(AppLocalizations l10n, MatchHistoryEntry m) {
+    final (icon, color, label) = switch (m.outcome) {
+      MatchOutcome.win => (Icons.emoji_events_rounded, AppColors.success, l10n.matchOutcomeWin),
+      MatchOutcome.loss => (Icons.close_rounded, AppColors.error, l10n.matchOutcomeLoss),
+      MatchOutcome.draw => (Icons.handshake_rounded, AppColors.accent, l10n.matchOutcomeDraw),
+      MatchOutcome.solo => (Icons.psychology_rounded, AppColors.primary, l10n.matchOutcomeSolo),
+    };
+    final typeLabel = switch (m.type) {
+      '1v1' => l10n.matchType1v1,
+      'tournament' => l10n.matchTypeTournament,
+      _ => l10n.matchTypeSolo,
+    };
+    final opponentName = m.opponent?.username ?? l10n.botBattle;
+    final scoreLine = m.opponent != null
+        ? '${m.myScore} : ${m.opponent!.score}'
+        : '${m.myScore}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: color.withValues(alpha: 0.4)),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        opponentName,
+                        style: AppTextStyles.titleMedium.copyWith(fontSize: 14),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      label,
+                      style: AppTextStyles.bodySmall.copyWith(color: color, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Text(typeLabel, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted, fontSize: 11)),
+                    const SizedBox(width: 8),
+                    Text(scoreLine, style: AppTextStyles.bodySmall.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

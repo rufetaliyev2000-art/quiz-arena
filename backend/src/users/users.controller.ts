@@ -1,9 +1,10 @@
-import { BadRequestException, Body, ConflictException, Controller, Get, Patch, Post, UseGuards, Request } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, Get, Patch, Post, Query, UseGuards, Request } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DeviceGuard } from '../auth/guards/device.guard';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, DeviceGuard)
 export class UsersController {
   constructor(private usersService: UsersService) {}
 
@@ -31,5 +32,17 @@ export class UsersController {
       if (e?.message === 'username_taken') throw new ConflictException('username_taken');
       throw e;
     }
+  }
+
+  /// Klient yazarkən canlı yoxlayır. Format də səhv olarsa
+  /// `available=false, reason='format'` qaytarılır ki, UI dəqiq mesaj
+  /// göstərsin.
+  @Get('username-available')
+  async checkUsername(@Request() req, @Query('name') name?: string) {
+    const raw = (name ?? '').trim();
+    if (raw.length < 3) return { available: false, reason: 'min_three_chars' };
+    if (!/^[a-zA-Z0-9_]+$/.test(raw)) return { available: false, reason: 'format' };
+    const available = await this.usersService.isUsernameAvailable(req.user.id, raw);
+    return { available, reason: available ? null : 'taken' };
   }
 }

@@ -100,7 +100,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> with SingleTicker
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(l10n.friendsTitle, style: AppTextStyles.headlineLarge),
+                  Expanded(
+                    child: Text(
+                      l10n.friendsTitle,
+                      style: AppTextStyles.headlineLarge,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   GestureDetector(
                     onTap: () => _openAddDialog(l10n),
                     child: Container(

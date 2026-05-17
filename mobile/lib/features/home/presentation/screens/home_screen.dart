@@ -13,6 +13,8 @@ import '../../../missions/data/daily_mission.dart';
 import '../../../missions/providers/daily_missions_provider.dart';
 import '../../data/user_repository.dart';
 import '../../providers/user_provider.dart';
+import '../../../profile/providers/profile_customization_provider.dart';
+import '../../../profile/presentation/widgets/profile_avatar.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -86,6 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildHeader() {
     final profileAsync = ref.watch(userProfileProvider);
     final localStats = ref.watch(localGameStatsProvider);
+    final customization = ref.watch(profileCustomizationProvider);
 
     return profileAsync.when(
       loading: () => const Padding(
@@ -100,19 +103,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Container(
-                  width: 52,
-                  height: 52,
-                  decoration: BoxDecoration(
-                    gradient: AppColors.gradientPrimary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary, width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      profile.username[0].toUpperCase(),
-                      style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                    ),
+                GestureDetector(
+                  onTap: () => context.go('/profile'),
+                  child: ProfileAvatar(
+                    username: profile.username,
+                    customization: customization,
+                    size: 52,
                   ),
                 ),
                 Positioned(
@@ -471,7 +467,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               right: 16,
               top: 0,
               bottom: 0,
-              child: const Text('🏆', style: TextStyle(fontSize: 64))
+              child: const Icon(Icons.emoji_events_rounded, size: 80, color: Colors.amber)
                   .animate()
                   .scale(delay: 400.ms, duration: 600.ms, curve: Curves.elasticOut),
             ),
@@ -486,21 +482,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(l10n.startsIn, style: AppTextStyles.bodySmall.copyWith(color: Colors.white54, fontSize: 10)),
-                          Text(
-                            '${_pad(_remaining.inHours)}:${_pad(_remaining.inMinutes % 60)}:${_pad(_remaining.inSeconds % 60)}',
-                            style: AppTextStyles.titleLarge.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 2),
-                          ),
-                        ],
+                      Flexible(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l10n.startsIn, style: AppTextStyles.bodySmall.copyWith(color: Colors.white54, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(
+                              '${_pad(_remaining.inHours)}:${_pad(_remaining.inMinutes % 60)}:${_pad(_remaining.inSeconds % 60)}',
+                              style: AppTextStyles.titleLarge.copyWith(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 2),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       GestureDetector(
                         onTap: () => context.go('/tournaments'),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
                             color: AppColors.gold,
                             borderRadius: BorderRadius.circular(10),
@@ -533,7 +533,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: _buildModeCard(
                   title: '1v1',
                   subtitle: l10n.quickBattle,
-                  emoji: '⚔️',
+                  icon: Icons.flash_on_rounded,
                   gradient: AppColors.gradientPrimary,
                   onTap: () => context.push('/battle'),
                 ).animate().fadeIn(delay: 300.ms).slideX(begin: -0.2),
@@ -543,7 +543,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: _buildModeCard(
                   title: l10n.botBattle,
                   subtitle: l10n.botBattleSubtitle,
-                  emoji: '🤖',
+                  icon: Icons.smart_toy_rounded,
                   gradient: AppColors.gradientCyan,
                   onTap: () => context.push('/bot-battle'),
                 ).animate().fadeIn(delay: 360.ms).slideY(begin: 0.2),
@@ -557,7 +557,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: _buildModeCard(
                   title: l10n.soloPlay,
                   subtitle: l10n.soloSubtitle,
-                  emoji: '🧠',
+                  icon: Icons.psychology_rounded,
                   gradient: AppColors.gradientBattle,
                   onTap: () => context.push('/quiz'),
                 ).animate().fadeIn(delay: 420.ms).slideX(begin: -0.2),
@@ -567,7 +567,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: _buildModeCard(
                   title: l10n.battleRoyaleTitle,
                   subtitle: l10n.lastOneWins,
-                  emoji: '👑',
+                  icon: Icons.workspace_premium_rounded,
                   gradient: AppColors.gradientBattleRoyale,
                   onTap: () => context.go('/tournaments'),
                 ).animate().fadeIn(delay: 480.ms).slideX(begin: 0.2),
@@ -582,7 +582,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildModeCard({
     required String title,
     required String subtitle,
-    required String emoji,
+    required IconData icon,
     required LinearGradient gradient,
     required VoidCallback onTap,
   }) {
@@ -600,7 +600,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(emoji, style: const TextStyle(fontSize: 30)),
+            Icon(icon, size: 32, color: Colors.white),
             const SizedBox(height: 6),
             Text(
               title,
@@ -628,10 +628,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.dailyMissions, style: AppTextStyles.labelLarge.copyWith(letterSpacing: 1, fontSize: 13)),
+              Expanded(
+                child: Text(
+                  l10n.dailyMissions,
+                  style: AppTextStyles.labelLarge.copyWith(letterSpacing: 1, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
                 l10n.missionRefreshIn(_formatRefreshCountdown(missionsState.timeUntilRefresh(DateTime.now()))),
                 style: AppTextStyles.bodySmall.copyWith(color: AppColors.textMuted, fontSize: 11),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
@@ -796,7 +806,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(l10n.leaderboard.toUpperCase(), style: AppTextStyles.labelLarge.copyWith(letterSpacing: 1, fontSize: 13)),
+              Expanded(
+                child: Text(
+                  l10n.leaderboard.toUpperCase(),
+                  style: AppTextStyles.labelLarge.copyWith(letterSpacing: 1, fontSize: 13),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () => context.go('/leaderboard'),
                 child: Container(
@@ -825,7 +843,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               final top = players.take(4).toList();
               return Row(
                 children: top.asMap().entries.map((e) {
-                  final medal = e.key == 0 ? '🥇' : (e.key == 1 ? '🥈' : (e.key == 2 ? '🥉' : '${e.key + 1}'));
+                  final rank = e.key + 1;
                   return Expanded(
                     child: Container(
                       margin: EdgeInsets.only(right: e.key < top.length - 1 ? 8 : 0),
@@ -835,7 +853,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: const Color(0xFF2A2A50)),
                       ),
-                      child: _buildLeaderboardCell(e.value, medal),
+                      child: _buildLeaderboardCell(e.value, rank),
                     ).animate().fadeIn(delay: Duration(milliseconds: 400 + e.key * 80)).slideY(begin: 0.2),
                   );
                 }).toList(),
@@ -847,7 +865,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildLeaderboardCell(LeaderboardEntry p, String medal) {
+  Widget _buildLeaderboardCell(LeaderboardEntry p, int rank) {
+    final medalColor = rank == 1
+        ? const Color(0xFFFFD700)
+        : rank == 2
+            ? const Color(0xFFC0C0C0)
+            : rank == 3
+                ? const Color(0xFFCD7F32)
+                : AppColors.textMuted;
     return Column(
       children: [
         Stack(
@@ -859,10 +884,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Text(p.username[0], style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
             ),
             Positioned(
-              bottom: -4,
+              bottom: -6,
               left: 0,
               right: 0,
-              child: Center(child: Text(medal, style: const TextStyle(fontSize: 14))),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: medalColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.background, width: 2),
+                  ),
+                  child: Text(
+                    '$rank',
+                    style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -899,10 +937,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: AppTextStyles.labelLarge.copyWith(letterSpacing: 1, fontSize: 13)),
+        Expanded(
+          child: Text(
+            title,
+            style: AppTextStyles.labelLarge.copyWith(letterSpacing: 1, fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
         GestureDetector(
           onTap: onAction,
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(actionText, style: AppTextStyles.bodySmall.copyWith(color: AppColors.primaryLight, fontWeight: FontWeight.w600)),
               const SizedBox(width: 4),

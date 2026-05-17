@@ -92,6 +92,79 @@ export class AuthService {
     await this.usersRepo.update(userId, { refresh_token: null });
   }
 
+  // ──────── Sign-up OTP gate (sosial giriş sonrası, username-dən əvvəl) ────────
+
+  async sendSignupOtp(userId: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('user_not_found');
+    if (!user.email) throw new BadRequestException('no_email_on_profile');
+    if (user.signup_otp_verified) return { sent: false, alreadyVerified: true };
+    await this.otp.send(user.email);
+    return { sent: true };
+  }
+
+  /// Sign-up OTP-i təsdiq edir VƏ ilk cihaz kimi qeyd edir. Bir əməliyyat —
+  /// belə ki istifadəçi adı təyin etməyə getməzdən əvvəl artıq cihaz claim
+  /// edilib və ikinci cihazdan giriş mümkün deyil.
+  async verifySignupOtp(userId: string, code: string, deviceId: string, deviceLabel?: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('user_not_found');
+    if (!user.email) throw new BadRequestException('no_email_on_profile');
+    if (!deviceId?.trim()) throw new BadRequestException('missing_device_id');
+    if (!user.signup_otp_verified) {
+      const res = this.otp.verify(user.email, code);
+      if (!res.ok) throw new BadRequestException(res.reason ?? 'invalid_otp');
+    }
+    await this.usersRepo.update(userId, {
+      signup_otp_verified: true,
+      email_verified: true,
+      active_device_id: deviceId.trim(),
+      active_device_label: (deviceLabel ?? '').trim() || null,
+      active_device_claimed_at: new Date(),
+    });
+    return { verified: true, deviceClaimed: true };
+  }
+
+  // ──────── Device claim flow (ikinci cihazdan giriş) ────────
+
+  async getDeviceStatus(userId: string, requestingDeviceId: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('user_not_found');
+    const active = user.active_device_id;
+    return {
+      signupOtpVerified: user.signup_otp_verified,
+      hasActiveDevice: !!active,
+      currentIsActive: active != null && active === requestingDeviceId,
+      activeDeviceLabel: user.active_device_label,
+    };
+  }
+
+  /// Cari cihaz aktiv DEYİL — OTP göndər ki, istifadəçi bu cihazı claim etsin.
+  async sendDeviceOtp(userId: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('user_not_found');
+    if (!user.email) throw new BadRequestException('no_email_on_profile');
+    await this.otp.send(user.email);
+    return { sent: true };
+  }
+
+  /// OTP düzgündürsə active_device_id-ni bu cihaza yenilə. Köhnə cihaz növbəti
+  /// API çağırışında 403 alacaq və FE onu çıxış edəcək.
+  async claimDevice(userId: string, code: string, deviceId: string, deviceLabel?: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('user_not_found');
+    if (!user.email) throw new BadRequestException('no_email_on_profile');
+    if (!deviceId?.trim()) throw new BadRequestException('missing_device_id');
+    const res = this.otp.verify(user.email, code);
+    if (!res.ok) throw new BadRequestException(res.reason ?? 'invalid_otp');
+    await this.usersRepo.update(userId, {
+      active_device_id: deviceId.trim(),
+      active_device_label: (deviceLabel ?? '').trim() || null,
+      active_device_claimed_at: new Date(),
+    });
+    return { claimed: true };
+  }
+
   private async generateTokens(user: User) {
     const payload = { sub: user.id, username: user.username };
 

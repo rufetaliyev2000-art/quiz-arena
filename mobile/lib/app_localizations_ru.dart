@@ -722,28 +722,28 @@ class AppLocalizationsRu extends AppLocalizations {
   String get botThinking => 'Бот думает...';
 
   @override
-  String get botAnswered => 'Бот ответил ✓';
+  String get botAnswered => 'Бот ответил';
 
   @override
-  String get youWon => 'Вы победили! 🎉';
+  String get youWon => 'Вы победили!';
 
   @override
-  String get botWon => 'Бот победил 🤖';
+  String get botWon => 'Бот победил';
 
   @override
   String get opponentThinking => 'думает...';
 
   @override
-  String get opponentAnswered => 'ответил ✓';
+  String get opponentAnswered => 'ответил';
 
   @override
   String get opponentWon => 'Соперник победил';
 
   @override
-  String get youLost => 'Вы проиграли 💔';
+  String get youLost => 'Вы проиграли';
 
   @override
-  String get drawResult => 'Ничья! 🤝';
+  String get drawResult => 'Ничья!';
 
   @override
   String get yourScore => 'Ваш счёт';
@@ -803,4 +803,116 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get connectionLostMessage => 'Соединение прервано';
+
+  @override
+  String get battleStartingTitle => 'БИТВА НАЧИНАЕТСЯ';
+
+  @override
+  String get battleWord => 'БИТВА!';
+
+  @override
+  String get sendFriendRequestLabel => 'Добавить в друзья';
+
+  @override
+  String get friendRequestSentLabel => 'Запрос отправлен';
+
+  @override
+  String get matchHistoryEmpty => 'История матчей пуста';
+
+  @override
+  String get matchHistoryError => 'Не удалось загрузить историю';
+
+  @override
+  String get matchOutcomeWin => 'ПОБЕДА';
+
+  @override
+  String get matchOutcomeLoss => 'ПОРАЖЕНИЕ';
+
+  @override
+  String get matchOutcomeDraw => 'НИЧЬЯ';
+
+  @override
+  String get matchOutcomeSolo => 'СОЛО';
+
+  @override
+  String get matchType1v1 => '1v1';
+
+  @override
+  String get matchTypeTournament => 'Турнир';
+
+  @override
+  String get matchTypeSolo => 'Соло';
+
+  @override
+  String get editProfileTitle => 'Изменить профиль';
+
+  @override
+  String get chooseAvatar => 'Выберите аватар';
+
+  @override
+  String get chooseFrame => 'Рамка';
+
+  @override
+  String get chooseColor => 'Цвет';
+
+  @override
+  String get useInitialLetter => 'Буква';
+
+  @override
+  String get saveAction => 'Сохранить';
+
+  @override
+  String get profileUpdated => 'Профиль обновлён';
+
+  @override
+  String get editProfileTooltip => 'Изменить профиль';
+
+  @override
+  String get usernameAvailable => 'Имя свободно';
+
+  @override
+  String get signupOtpTitle => 'Подтвердите email';
+
+  @override
+  String get signupOtpSubtitle =>
+      'Введите 6-значный код, отправленный на вашу почту';
+
+  @override
+  String get signupOtpVerify => 'ПОДТВЕРДИТЬ';
+
+  @override
+  String get signupOtpResend => 'Отправить код снова';
+
+  @override
+  String signupOtpResendIn(int seconds) {
+    return 'Повторно через $seconds с';
+  }
+
+  @override
+  String get signupOtpInvalid => 'Код неверен или истёк';
+
+  @override
+  String get signupOtpSent => 'Код отправлен на ваш email';
+
+  @override
+  String get otpCodeLength => 'Введите все 6 цифр';
+
+  @override
+  String get claimDeviceTitle => 'Привязать это устройство';
+
+  @override
+  String get claimDeviceSubtitle =>
+      'Ваш аккаунт активен на другом устройстве. Введите код из почты, чтобы привязать это устройство.';
+
+  @override
+  String get claimDeviceContinue => 'ПРИВЯЗАТЬ УСТРОЙСТВО';
+
+  @override
+  String get claimDeviceLogout => 'Выйти';
+
+  @override
+  String get claimDeviceSuccess => 'Устройство привязано';
+
+  @override
+  String get claimDeviceActiveLabel => 'Активное сейчас';
 }

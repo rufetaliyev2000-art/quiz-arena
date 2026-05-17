@@ -16,6 +16,7 @@ class UserProfile {
   final int losses;
   final bool isPremium;
   final bool usernameSet;
+  final bool signupOtpVerified;
   final String friendCode;
 
   const UserProfile({
@@ -31,6 +32,7 @@ class UserProfile {
     required this.losses,
     required this.isPremium,
     required this.usernameSet,
+    required this.signupOtpVerified,
     required this.friendCode,
   });
 
@@ -47,6 +49,7 @@ class UserProfile {
         losses: (j['losses'] as num).toInt(),
         isPremium: j['is_premium'] as bool? ?? false,
         usernameSet: j['username_set'] as bool? ?? true,
+        signupOtpVerified: j['signup_otp_verified'] as bool? ?? true,
         friendCode: (j['friend_code'] as String?) ?? '',
       );
 
@@ -64,6 +67,7 @@ class UserProfile {
         losses: 0,
         isPremium: false,
         usernameSet: true,
+        signupOtpVerified: true,
         friendCode: '',
       );
 
@@ -149,6 +153,20 @@ class UserRepository {
       data: {'username': username},
     );
     return UserProfile.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  /// Canlı yoxlama: bu username istifadəçi tərəfindən götürülə bilərmi?
+  /// `reason`: null | 'min_three_chars' | 'format' | 'taken'.
+  Future<({bool available, String? reason})> checkUsernameAvailable(String username) async {
+    final response = await _dio.get(
+      '/users/username-available',
+      queryParameters: {'name': username},
+    );
+    final data = response.data as Map<String, dynamic>;
+    return (
+      available: data['available'] as bool? ?? false,
+      reason: data['reason'] as String?,
+    );
   }
 
   /// Bot/solo oyunlarından lokal queue-da yığılan mükafatları backend-ə

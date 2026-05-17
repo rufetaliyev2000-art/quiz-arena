@@ -30,6 +30,15 @@ export class UsersService {
     return this.findById(id);
   }
 
+  /// Canlı yoxlama: bu username mövcuddur (özündən başqası onu götürübmü?).
+  /// Selfdirsə (öz cari adı) `available: true` qaytarılır ki, save düyməsi
+  /// aktiv qalsın.
+  async isUsernameAvailable(id: string, username: string): Promise<boolean> {
+    const existing = await this.repo.findOne({ where: { username } });
+    if (!existing) return true;
+    return existing.id === id;
+  }
+
   async getLeaderboardPosition(id: string) {
     const user = await this.findById(id);
     return { elo: user.elo, wins: user.wins, losses: user.losses };

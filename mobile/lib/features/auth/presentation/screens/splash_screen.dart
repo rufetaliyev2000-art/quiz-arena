@@ -7,6 +7,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/gguiz_logo.dart';
+import '../../../home/providers/user_provider.dart';
 import '../../providers/auth_provider.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -31,15 +32,57 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   void _maybeNavigate() {
     if (_navigated || !mounted) return;
     final authState = ref.read(authProvider);
-    final loggedIn = authState.whenOrNull(
-      data: (s) => s.status == AuthStatus.authenticated,
-    );
-    if (loggedIn == null) return; // hÉ™lÉ™ Loading
+    final s = authState.value;
+    if (s == null) return; // hələ Loading
+
+    // Authenticated deyilsə birbaşa login-ə.
+    if (s.status != AuthStatus.authenticated) {
+      _navigated = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/login');
+      });
+      return;
+    }
+
+    // Cihaz uyğunsuzluğu varsa router redirect /claim-device-ə aparacaq —
+    // burada ekstra GET /users/me etməyə ehtiyac yoxdur (yenə 403 olacaq).
+    if (s.deviceMismatch) {
+      _navigated = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/claim-device');
+      });
+      return;
+    }
+
+    // Profile-i yüklə və signupOtpVerified / usernameSet bayraqlarına görə yönlən.
     _navigated = true;
-    final target = loggedIn ? '/home' : '/login';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) context.go(target);
-    });
+    _resolveAndNavigate();
+  }
+
+  Future<void> _resolveAndNavigate() async {
+    try {
+      final profile = await ref.read(userProfileProvider.future);
+      if (!mounted) return;
+      String target;
+      if (!profile.signupOtpVerified) {
+        target = '/signup-otp';
+      } else if (!profile.usernameSet) {
+        target = '/setup-username';
+      } else {
+        target = '/home';
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go(target);
+      });
+    } catch (_) {
+      // /users/me 403 device_mismatch atırsa interceptor authProvider-i
+      // işarələyəcək — listener bunu görüb yenidən _maybeNavigate çağırır.
+      // Şəbəkə xətasında /home-a yönləndiririk (offline UserProfile fallback).
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.go('/home');
+      });
+    }
   }
 
   void _forceNavigateToLogin() {

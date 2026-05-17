@@ -723,28 +723,28 @@ class AppLocalizationsAz extends AppLocalizations {
   String get botThinking => 'Bot düşünür...';
 
   @override
-  String get botAnswered => 'Bot cavabladı ✓';
+  String get botAnswered => 'Bot cavabladı';
 
   @override
-  String get youWon => 'Siz Qazandınız! 🎉';
+  String get youWon => 'Siz Qazandınız!';
 
   @override
-  String get botWon => 'Bot Qazandı 🤖';
+  String get botWon => 'Bot Qazandı';
 
   @override
   String get opponentThinking => 'düşünür...';
 
   @override
-  String get opponentAnswered => 'cavabladı ✓';
+  String get opponentAnswered => 'cavabladı';
 
   @override
   String get opponentWon => 'Rəqib Qazandı';
 
   @override
-  String get youLost => 'Siz Uduzdunuz 💔';
+  String get youLost => 'Siz Uduzdunuz';
 
   @override
-  String get drawResult => 'Bərabərlik! 🤝';
+  String get drawResult => 'Bərabərlik!';
 
   @override
   String get yourScore => 'Sizin Xal';
@@ -804,4 +804,116 @@ class AppLocalizationsAz extends AppLocalizations {
 
   @override
   String get connectionLostMessage => 'Bağlantı kəsildi';
+
+  @override
+  String get battleStartingTitle => 'DÖYÜŞ BAŞLAYIR';
+
+  @override
+  String get battleWord => 'DÖYÜŞ!';
+
+  @override
+  String get sendFriendRequestLabel => 'Dostluq göndər';
+
+  @override
+  String get friendRequestSentLabel => 'Sorğu göndərildi';
+
+  @override
+  String get matchHistoryEmpty => 'Hələ matç tarixçəsi yoxdur';
+
+  @override
+  String get matchHistoryError => 'Tarixçə yüklənmədi';
+
+  @override
+  String get matchOutcomeWin => 'QALİB';
+
+  @override
+  String get matchOutcomeLoss => 'MƏĞLUB';
+
+  @override
+  String get matchOutcomeDraw => 'HEÇ-HEÇƏ';
+
+  @override
+  String get matchOutcomeSolo => 'SOLO';
+
+  @override
+  String get matchType1v1 => '1v1';
+
+  @override
+  String get matchTypeTournament => 'Turnir';
+
+  @override
+  String get matchTypeSolo => 'Solo';
+
+  @override
+  String get editProfileTitle => 'Profili Düzəlt';
+
+  @override
+  String get chooseAvatar => 'Avatar seç';
+
+  @override
+  String get chooseFrame => 'Çərçivə';
+
+  @override
+  String get chooseColor => 'Rəng';
+
+  @override
+  String get useInitialLetter => 'İlk hərf';
+
+  @override
+  String get saveAction => 'Yadda saxla';
+
+  @override
+  String get profileUpdated => 'Profil yeniləndi';
+
+  @override
+  String get editProfileTooltip => 'Profili düzəlt';
+
+  @override
+  String get usernameAvailable => 'Ad uyğundur';
+
+  @override
+  String get signupOtpTitle => 'Email-i təsdiqlə';
+
+  @override
+  String get signupOtpSubtitle =>
+      'Email ünvanınıza göndərilən 6-rəqəmli kodu daxil edin';
+
+  @override
+  String get signupOtpVerify => 'TƏSDİQLƏ';
+
+  @override
+  String get signupOtpResend => 'Kodu yenidən göndər';
+
+  @override
+  String signupOtpResendIn(int seconds) {
+    return '$seconds san sonra yenidən göndər';
+  }
+
+  @override
+  String get signupOtpInvalid => 'Kod yanlışdır və ya vaxtı keçib';
+
+  @override
+  String get signupOtpSent => 'Kod email ünvanınıza göndərildi';
+
+  @override
+  String get otpCodeLength => 'Tam 6 rəqəm tələb olunur';
+
+  @override
+  String get claimDeviceTitle => 'Yeni cihaz qeyd et';
+
+  @override
+  String get claimDeviceSubtitle =>
+      'Hesabınız başqa cihazda aktivdir. Bu cihazı qeyd etmək üçün email-ə göndərilən kodu daxil edin.';
+
+  @override
+  String get claimDeviceContinue => 'BU CİHAZI QEYD ET';
+
+  @override
+  String get claimDeviceLogout => 'Çıxış et';
+
+  @override
+  String get claimDeviceSuccess => 'Cihaz uğurla qeyd olundu';
+
+  @override
+  String get claimDeviceActiveLabel => 'Hazırda aktiv';
 }

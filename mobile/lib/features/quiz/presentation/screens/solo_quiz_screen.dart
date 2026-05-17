@@ -116,7 +116,7 @@ class _SoloQuizScreenState extends ConsumerState<SoloQuizScreen> with TickerProv
           coins: coins,
           outcome: outcome,
         );
-    // Solo "match" sayÄ±lÄ±r, lakin winMatch vÉ™ streak yalnÄ±z 1v1/bot Ã¼Ã§Ã¼n.
+    // Solo "match" sayılır, lakin winMatch və streak yalnız 1v1/bot üçün.
     ref.read(dailyMissionsProvider.notifier).incrementProgress(MissionType.playMatch, 1);
   }
 
@@ -157,7 +157,7 @@ class _SoloQuizScreenState extends ConsumerState<SoloQuizScreen> with TickerProv
       body: Container(
         decoration: const BoxDecoration(gradient: AppColors.gradientBackground),
         child: SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
@@ -307,7 +307,7 @@ class _SoloQuizScreenState extends ConsumerState<SoloQuizScreen> with TickerProv
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  isGood ? 'ðŸ†' : 'ðŸ“š',
+                  isGood ? '🏆' : '📚',
                   style: const TextStyle(fontSize: 72),
                 ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
                 const SizedBox(height: 16),
@@ -331,11 +331,11 @@ class _SoloQuizScreenState extends ConsumerState<SoloQuizScreen> with TickerProv
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildStat('âœ…', '$_score', l10n.totalWins),
+                      _buildStat('✅', '$_score', l10n.totalWins),
                       Container(width: 1, height: 50, color: const Color(0xFF2A2A40)),
-                      _buildStat('âŒ', '${_questions.length - _score}', l10n.losses),
+                      _buildStat('❌', '${_questions.length - _score}', l10n.losses),
                       Container(width: 1, height: 50, color: const Color(0xFF2A2A40)),
-                      _buildStat('ðŸ“Š', '$percent%', l10n.winRate),
+                      _buildStat('📊', '$percent%', l10n.winRate),
                     ],
                   ),
                 ).animate().fadeIn(delay: 400.ms),

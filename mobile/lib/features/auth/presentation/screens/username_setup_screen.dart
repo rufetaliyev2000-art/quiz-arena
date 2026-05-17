@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../home/data/user_repository.dart';
 import '../../../home/providers/user_provider.dart';
 
 /// Supabase Auth ilə qeydiyyatdan keçən istifadəçi avtomatik username alır
@@ -110,22 +110,21 @@ class _UsernameSetupScreenState extends ConsumerState<UsernameSetupScreen> {
     });
     try {
       await ref.read(userRepositoryProvider).setUsername(_ctrl.text.trim());
-      // Cache-i sıfırla ki, /home yenidən GET /users/me etsin
+      // Cache-i sıfırla ki, /home yenidən get_my_profile etsin
       ref.invalidate(userProfileProvider);
       if (!mounted) return;
       context.go('/home');
-    } on DioException catch (e) {
+    } on UsernameTakenException {
       if (!mounted) return;
-      final code = e.response?.statusCode;
       setState(() {
         _loading = false;
-        if (code == 409) {
-          _errorText = l10n.usernameSetupErrorTaken;
-        } else if (code == 400) {
-          _errorText = l10n.usernameSetupErrorFormat;
-        } else {
-          _errorText = l10n.usernameSetupSaveFailed;
-        }
+        _errorText = l10n.usernameSetupErrorTaken;
+      });
+    } on UsernameFormatException {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _errorText = l10n.usernameSetupErrorFormat;
       });
     } catch (_) {
       if (!mounted) return;

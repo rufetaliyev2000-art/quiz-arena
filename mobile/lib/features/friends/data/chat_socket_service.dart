@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:socket_io_client/socket_io_client.dart' as io;
-import '../../../core/constants/api_constants.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChatMessage {
   final String id;
@@ -23,35 +22,25 @@ class ChatMessage {
       );
 }
 
-/// Ephemeral 1:1 chat — bütün mesajlar yalnız aktiv session-da yaşayır.
-/// Yazışmadan çıxanda `close()` çağırılmalıdır ki, server-də də silinsin.
+/// Ephemeral 1:1 chat — Supabase Realtime broadcast üzərində qurulub.
+/// Heç bir mesaj DB-də saxlanılmır; channel-də session-ı olan istifadəçilər
+/// real-time görüşür. Sıralanmış peer pair-ə görə channel adı: `chat:<a>:<b>`.
 class ChatSocketService {
-  io.Socket? _socket;
+  final SupabaseClient _client;
+  RealtimeChannel? _channel;
   String? _chatId;
+  String? _myUserId;
+  // mesajları lokal cache-də saxla (peer joined olduqda göndərə bilək)
+  final List<ChatMessage> _localCache = [];
 
-  bool get isConnected => _socket?.connected ?? false;
+  ChatSocketService(this._client);
+
+  bool get isConnected => _channel != null;
   String? get chatId => _chatId;
 
+  /// Realtime SDK öz idarə edir — connect əsasən noop.
   void connect({void Function()? onConnected, void Function(Object)? onError}) {
-    if (_socket != null && _socket!.connected) {
-      onConnected?.call();
-      return;
-    }
-    debugPrint('[chat-ws] connecting');
-    _socket ??= io.io(
-      '${ApiConstants.wsUrl}/chat',
-      io.OptionBuilder().setTransports(['websocket']).disableAutoConnect().build(),
-    );
-    _socket!.onConnect((_) {
-      debugPrint('[chat-ws] connected, sock=${_socket!.id}');
-      onConnected?.call();
-    });
-    _socket!.onDisconnect((_) => debugPrint('[chat-ws] disconnected'));
-    _socket!.onConnectError((e) {
-      debugPrint('[chat-ws] connect error: $e');
-      onError?.call(e as Object);
-    });
-    _socket!.connect();
+    onConnected?.call();
   }
 
   void open({
@@ -64,58 +53,94 @@ class ChatSocketService {
     required void Function(bool isTyping) onTyping,
     required void Function(String code) onError,
   }) {
-    _socket!.on('chat:opened', (data) {
-      if (data is Map) {
-        final cid = data['chatId'] as String;
-        _chatId = cid;
-        final msgs = (data['messages'] as List?)
-                ?.map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m as Map)))
-                .toList() ??
-            [];
-        onOpened(cid, msgs, data['peerOnline'] == true);
-      }
-    });
-    _socket!.on('chat:message', (data) {
-      if (data is Map) onMessage(ChatMessage.fromJson(Map<String, dynamic>.from(data)));
-    });
-    _socket!.on('chat:peer-joined', (_) => onPeerJoined());
-    _socket!.on('chat:peer-left', (_) => onPeerLeft());
-    _socket!.on('chat:typing', (data) {
-      if (data is Map) onTyping(data['isTyping'] == true);
-    });
-    _socket!.on('chat:error', (data) {
-      if (data is Map) onError(data['code'] as String? ?? 'unknown');
-    });
-    _socket!.emit('chat:open', {'userId': userId, 'peerId': peerId});
+    _myUserId = userId;
+    final sorted = [userId, peerId]..sort();
+    final cid = 'chat:${sorted[0]}:${sorted[1]}';
+    _chatId = cid;
+
+    _channel?.unsubscribe();
+    _channel = _client.channel(cid, opts: const RealtimeChannelConfig(self: false))
+      ..onBroadcast(
+        event: 'message',
+        callback: (payload) {
+          try {
+            onMessage(ChatMessage.fromJson(Map<String, dynamic>.from(payload)));
+          } catch (e) {
+            debugPrint('[chat-rt] message parse error: $e');
+          }
+        },
+      )
+      ..onBroadcast(
+        event: 'typing',
+        callback: (payload) {
+          if (payload['userId'] == userId) return; // öz event-ini iqnor et
+          onTyping(payload['isTyping'] == true);
+        },
+      )
+      ..onPresenceSync((_) {
+        // Presence sinxronlaşması — peer-in olub-olmadığını yoxla
+        final state = _channel?.presenceState() ?? const [];
+        final hasPeer = state.any((p) =>
+            p.presences.any((pr) => pr.payload['userId'] == peerId));
+        if (hasPeer) onPeerJoined();
+      })
+      ..onPresenceJoin((payload) {
+        if (payload.newPresences.any((p) => p.payload['userId'] == peerId)) {
+          onPeerJoined();
+        }
+      })
+      ..onPresenceLeave((payload) {
+        if (payload.leftPresences.any((p) => p.payload['userId'] == peerId)) {
+          onPeerLeft();
+        }
+      })
+      ..subscribe((status, error) async {
+        if (status == RealtimeSubscribeStatus.subscribed) {
+          await _channel?.track({'userId': userId});
+          onOpened(cid, List.unmodifiable(_localCache), false);
+        } else if (status == RealtimeSubscribeStatus.channelError) {
+          onError(error?.toString() ?? 'channel_error');
+        }
+      });
   }
 
   void send(String text) {
-    if (_chatId == null) return;
-    _socket?.emit('chat:send', {'chatId': _chatId, 'text': text});
+    final channel = _channel;
+    final myId = _myUserId;
+    if (channel == null || myId == null) return;
+    final msg = ChatMessage(
+      id: '${DateTime.now().microsecondsSinceEpoch}',
+      fromUserId: myId,
+      text: text,
+      sentAt: DateTime.now(),
+    );
+    _localCache.add(msg);
+    channel.sendBroadcastMessage(event: 'message', payload: {
+      'id': msg.id,
+      'fromUserId': myId,
+      'text': text,
+      'sentAt': msg.sentAt.millisecondsSinceEpoch,
+    });
   }
 
   void setTyping(bool isTyping) {
-    if (_chatId == null) return;
-    _socket?.emit('chat:typing', {'chatId': _chatId, 'isTyping': isTyping});
+    final channel = _channel;
+    final myId = _myUserId;
+    if (channel == null || myId == null) return;
+    channel.sendBroadcastMessage(event: 'typing', payload: {
+      'userId': myId,
+      'isTyping': isTyping,
+    });
   }
 
   void close() {
-    if (_chatId != null) {
-      _socket?.emit('chat:close', {'chatId': _chatId});
-      _chatId = null;
-    }
-    _socket?.off('chat:opened');
-    _socket?.off('chat:message');
-    _socket?.off('chat:peer-joined');
-    _socket?.off('chat:peer-left');
-    _socket?.off('chat:typing');
-    _socket?.off('chat:error');
+    _channel?.untrack();
+    _channel?.unsubscribe();
+    _channel = null;
+    _chatId = null;
+    _myUserId = null;
+    _localCache.clear();
   }
 
-  void disconnect() {
-    close();
-    _socket?.disconnect();
-    _socket?.dispose();
-    _socket = null;
-  }
+  void disconnect() => close();
 }

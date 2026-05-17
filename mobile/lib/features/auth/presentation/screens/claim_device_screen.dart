@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gguiz_battle/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/providers/device_id_provider.dart';
@@ -14,10 +14,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../home/providers/user_provider.dart';
 
-/// Bu cihaz hesabın active_device_id-si DEYİL. İstifadəçi OTP girib bu cihazı
-/// yeni "yeganə aktiv cihaz" kimi qeyd edə bilər. Köhnə cihaz növbəti API
-/// çağırışında 403 alacaq və avtomatik bu ekrana düşəcək (kim öncə claim
-/// edirsə, o qalır).
+/// Bu cihaz hesabın active_device_id-si DEYİL. İstifadəçi Supabase Auth OTP
+/// keçib `claim_device` RPC ilə bu cihazı yeni "yeganə aktiv cihaz" kimi
+/// qeyd edə bilər. Köhnə cihaz növbəti RPC çağırışında check_device()
+/// false qaytarır → o da bu ekrana düşür.
 class ClaimDeviceScreen extends ConsumerStatefulWidget {
   const ClaimDeviceScreen({super.key});
 
@@ -49,16 +49,14 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
   }
 
   Future<void> _bootstrap() async {
-    // device-status yalnız label-i göstərmək üçündür. Backend Dio interceptor
-    // X-Device-Id qoşur, lakin 403 device_mismatch artıq baş verib (deməli
-    // bu endpoint guard-dan kənarda olmalı idi). Hələlik səssizcə davam edirik
-    // və OTP göndərməyə keçirik.
     try {
-      final dio = ref.read(dioProvider);
-      final res = await dio.get('/auth/device-status');
-      final data = res.data as Map<String, dynamic>?;
-      if (mounted && data != null) {
-        setState(() => _activeLabel = data['activeDeviceLabel'] as String?);
+      final deviceId = await ref.read(deviceIdServiceProvider).get();
+      final response = await ref.read(supabaseClientProvider)
+          .rpc('get_device_status', params: {'p_device_id': deviceId});
+      final list = response as List<dynamic>;
+      if (mounted && list.isNotEmpty) {
+        final row = list.first as Map<String, dynamic>;
+        setState(() => _activeLabel = row['active_device_label'] as String?);
       }
     } catch (_) {/* səssiz */}
     if (!mounted) return;
@@ -69,25 +67,31 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
     setState(() => _cooldown = 60);
     _cooldownTimer?.cancel();
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
+      if (!mounted) { t.cancel(); return; }
       setState(() => _cooldown -= 1);
       if (_cooldown <= 0) t.cancel();
     });
   }
 
+  String? _myEmail() => ref.read(supabaseClientProvider).auth.currentUser?.email;
+
   Future<void> _sendOtp({bool initial = false}) async {
     if (_sending || _cooldown > 0) return;
+    final email = _myEmail();
+    if (email == null) {
+      setState(() => _error = AppLocalizations.of(context)!.errorGeneric);
+      return;
+    }
     setState(() {
       _sending = true;
       _error = null;
       if (!initial) _info = null;
     });
     try {
-      final dio = ref.read(dioProvider);
-      await dio.post('/auth/send-device-otp');
+      await ref.read(supabaseClientProvider).auth.signInWithOtp(
+            email: email,
+            shouldCreateUser: false,
+          );
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
       setState(() {
@@ -95,12 +99,12 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
         _info = l10n.signupOtpSent;
       });
       _startCooldown();
-    } on DioException catch (e) {
+    } on AuthException catch (_) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
       setState(() {
         _sending = false;
-        _error = _otpError(l10n, e);
+        _error = l10n.errorGeneric;
       });
     } catch (_) {
       if (!mounted) return;
@@ -115,8 +119,13 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
   Future<void> _claim() async {
     final l10n = AppLocalizations.of(context)!;
     final code = _ctrl.text.trim();
+    final email = _myEmail();
     if (code.length != 6) {
       setState(() => _error = l10n.otpCodeLength);
+      return;
+    }
+    if (email == null) {
+      setState(() => _error = l10n.errorGeneric);
       return;
     }
     setState(() {
@@ -125,31 +134,27 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
       _info = null;
     });
     try {
-      final dio = ref.read(dioProvider);
+      final supabase = ref.read(supabaseClientProvider);
+      await supabase.auth.verifyOTP(email: email, token: code, type: OtpType.email);
       final deviceId = await ref.read(deviceIdServiceProvider).get();
-      await dio.post('/auth/claim-device', data: {
-        'code': code,
-        'deviceId': deviceId,
-        'deviceLabel': deviceLabel(),
+      await supabase.rpc('claim_device', params: {
+        'p_device_id': deviceId,
+        'p_device_label': deviceLabel(),
       });
       if (!mounted) return;
-      // Backend active_device_id-ni bu cihaza yenilədi. Bayrağı sıfırla,
-      // profile cache-i yenidən fetch et və /home-a get.
       ref.read(authProvider.notifier).clearDeviceMismatch();
       ref.invalidate(userProfileProvider);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.claimDeviceSuccess),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(l10n.claimDeviceSuccess),
+        backgroundColor: AppColors.success,
+        duration: const Duration(seconds: 2),
+      ));
       context.go('/home');
-    } on DioException catch (e) {
+    } on AuthException catch (_) {
       if (!mounted) return;
       setState(() {
         _claiming = false;
-        _error = _otpError(l10n, e);
+        _error = l10n.signupOtpInvalid;
       });
     } catch (_) {
       if (!mounted) return;
@@ -166,12 +171,6 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
     if (mounted) context.go('/login');
   }
 
-  String _otpError(AppLocalizations l10n, DioException e) {
-    final code = e.response?.statusCode;
-    if (code == 400) return l10n.signupOtpInvalid;
-    return l10n.errorGeneric;
-  }
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -186,22 +185,15 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
               children: [
                 const SizedBox(height: 32),
                 Icon(Icons.devices_other_rounded, size: 64, color: AppColors.accent)
-                    .animate()
-                    .scale(duration: 500.ms, curve: Curves.elasticOut),
+                    .animate().scale(duration: 500.ms, curve: Curves.elasticOut),
                 const SizedBox(height: 20),
-                Text(l10n.claimDeviceTitle,
-                        style: AppTextStyles.displayMedium,
-                        textAlign: TextAlign.center)
-                    .animate()
-                    .fadeIn(delay: 100.ms)
-                    .slideY(begin: 0.2),
+                Text(l10n.claimDeviceTitle, style: AppTextStyles.displayMedium, textAlign: TextAlign.center)
+                    .animate().fadeIn(delay: 100.ms).slideY(begin: 0.2),
                 const SizedBox(height: 10),
                 Text(l10n.claimDeviceSubtitle,
-                        style: AppTextStyles.bodyMedium
-                            .copyWith(color: AppColors.textMuted),
-                        textAlign: TextAlign.center)
-                    .animate()
-                    .fadeIn(delay: 200.ms),
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                    textAlign: TextAlign.center)
+                    .animate().fadeIn(delay: 200.ms),
                 if (_activeLabel != null && _activeLabel!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Container(
@@ -211,19 +203,12 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.smartphone_rounded,
-                            size: 16, color: AppColors.accent),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${l10n.claimDeviceActiveLabel}: $_activeLabel',
-                          style: AppTextStyles.bodySmall
-                              .copyWith(color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.smartphone_rounded, size: 16, color: AppColors.accent),
+                      const SizedBox(width: 8),
+                      Text('${l10n.claimDeviceActiveLabel}: $_activeLabel',
+                          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+                    ]),
                   ).animate().fadeIn(delay: 250.ms),
                 ],
                 const SizedBox(height: 30),
@@ -272,11 +257,7 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
                       ),
                       child: Center(
                         child: _claiming
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : Text(l10n.claimDeviceContinue,
                                 style: AppTextStyles.labelLarge.copyWith(fontSize: 14, letterSpacing: 2)),
                       ),
@@ -288,9 +269,7 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
                   child: TextButton(
                     onPressed: (_cooldown > 0 || _sending) ? null : () => _sendOtp(),
                     child: Text(
-                      _cooldown > 0
-                          ? l10n.signupOtpResendIn(_cooldown)
-                          : l10n.signupOtpResend,
+                      _cooldown > 0 ? l10n.signupOtpResendIn(_cooldown) : l10n.signupOtpResend,
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: _cooldown > 0 ? AppColors.textMuted : AppColors.primaryLight,
                       ),
@@ -302,10 +281,8 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
                   child: TextButton.icon(
                     onPressed: _claiming ? null : _logout,
                     icon: const Icon(Icons.logout, size: 18, color: AppColors.error),
-                    label: Text(
-                      l10n.claimDeviceLogout,
-                      style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error),
-                    ),
+                    label: Text(l10n.claimDeviceLogout,
+                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
                   ),
                 ).animate().fadeIn(delay: 550.ms),
               ],
@@ -324,16 +301,11 @@ class _ClaimDeviceScreenState extends ConsumerState<ClaimDeviceScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: AppTextStyles.bodyMedium.copyWith(color: color)),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Text(text, style: AppTextStyles.bodyMedium.copyWith(color: color))),
+      ]),
     ).animate().fadeIn(duration: 200.ms);
   }
 }

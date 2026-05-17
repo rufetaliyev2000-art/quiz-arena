@@ -1,3 +1,11 @@
+## DEPRECATED
+
+Bu qovluq 2026-05-18-də Supabase miqrasiyasından sonra arxivləşdirilib. Bütün biznes məntiq Supabase-ə (Postgres RPC + Realtime) köçürülüb. Bax: [supabase/migrations/](../supabase/migrations/) və [supabase/SETUP.md](../supabase/SETUP.md). Railway servisi manual silinməlidir Railway dashboard-dan.
+
+Qovluq git history-də izi saxlamaq üçün qalır. Canlı testlərdən sonra `git rm -r backend-deprecated/` ilə tam silə bilərsiniz.
+
+---
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>

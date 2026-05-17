@@ -3,7 +3,7 @@ import '../../../core/providers/app_providers.dart';
 import '../data/friend_repository.dart';
 
 final friendRepositoryProvider = Provider<FriendRepository>((ref) {
-  return FriendRepository(ref.watch(dioProvider));
+  return FriendRepository(ref.watch(supabaseClientProvider));
 });
 
 class FriendsState {

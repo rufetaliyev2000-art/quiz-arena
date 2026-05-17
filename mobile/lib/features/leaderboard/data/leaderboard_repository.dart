@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LeaderboardEntry {
   final String id;
@@ -31,17 +31,19 @@ class LeaderboardEntry {
 }
 
 class LeaderboardRepository {
-  final Dio _dio;
-  const LeaderboardRepository(this._dio);
+  final SupabaseClient _client;
+  const LeaderboardRepository(this._client);
 
-  Future<List<LeaderboardEntry>> getTop() async {
+  Future<List<LeaderboardEntry>> getTop({int limit = 50}) async {
     try {
-      final response = await _dio.get('/leaderboard');
-      final list = response.data as List;
+      final response = await _client.rpc('get_leaderboard', params: {'p_limit': limit});
+      final list = response as List<dynamic>;
       return list
           .map((e) => LeaderboardEntry.fromJson(e as Map<String, dynamic>))
           .toList();
-    } on DioException {
+    } on PostgrestException {
+      return const [];
+    } catch (_) {
       return const [];
     }
   }

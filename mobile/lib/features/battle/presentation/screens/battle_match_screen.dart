@@ -14,7 +14,7 @@ import '../../../missions/providers/daily_missions_provider.dart';
 import '../../../profile/data/profile_customization.dart';
 import '../../../profile/providers/profile_customization_provider.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
-import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../data/battle_socket_service.dart';
@@ -64,6 +64,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
   int _currentQ = 0;
   int _myScore = 0;
   int _opponentScore = 0;
+  int _opponentCorrect = 0;
   int _myCorrect = 0;
   int _timeLeft = _totalTime;
   int? _myAnswer;
@@ -193,6 +194,7 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
         _myScore += _scoreFor(_myAnswerTimeMs ?? 15000);
       }
       if (oppCorrect) {
+        _opponentCorrect++;
         _opponentScore += _scoreFor(_opponentAnswerTimeMs ?? 15000);
       }
     });
@@ -226,6 +228,9 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
         userId: widget.args.userId,
         score: _myScore,
         correctAnswers: _myCorrect,
+        opponentUserId: widget.args.opponentUserId,
+        opponentScore: _opponentScore,
+        opponentCorrect: _opponentCorrect,
       );
     }
   }
@@ -774,31 +779,23 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.friendRequestSent), backgroundColor: AppColors.success),
       );
-    } on DioException catch (e) {
+    } on PostgrestException catch (e) {
       if (!mounted) return;
-      final code = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null) as String?;
+      final m = e.message;
       String msg;
       bool treatAsSuccess = false;
-      switch (code) {
-        case 'already_friends':
-          msg = l10n.errorAlreadyFriends;
-          treatAsSuccess = true;
-          break;
-        case 'already_pending':
-          msg = l10n.errorAlreadyPending;
-          treatAsSuccess = true;
-          break;
-        case 'cannot_friend_self':
-          msg = l10n.errorCannotFriendSelf;
-          break;
-        case 'user_not_found':
-          msg = l10n.errorUserNotFound;
-          break;
-        case 'blocked':
-          msg = l10n.errorBlocked;
-          break;
-        default:
-          msg = l10n.errorGeneric;
+      if (m.contains('already_friends')) {
+        msg = l10n.errorAlreadyFriends; treatAsSuccess = true;
+      } else if (m.contains('already_pending')) {
+        msg = l10n.errorAlreadyPending; treatAsSuccess = true;
+      } else if (m.contains('cannot_friend_self')) {
+        msg = l10n.errorCannotFriendSelf;
+      } else if (m.contains('user_not_found')) {
+        msg = l10n.errorUserNotFound;
+      } else if (m.contains('blocked')) {
+        msg = l10n.errorBlocked;
+      } else {
+        msg = l10n.errorGeneric;
       }
       setState(() {
         _friendRequestLoading = false;
@@ -806,6 +803,12 @@ class _BattleMatchScreenState extends ConsumerState<BattleMatchScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), backgroundColor: treatAsSuccess ? AppColors.accent : AppColors.error),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _friendRequestLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorGeneric), backgroundColor: AppColors.error),
       );
     }
   }

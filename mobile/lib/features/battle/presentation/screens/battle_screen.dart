@@ -13,6 +13,7 @@ import '../../../home/providers/user_provider.dart';
 import '../../../profile/data/profile_customization.dart';
 import '../../../profile/providers/profile_customization_provider.dart';
 import '../../../profile/presentation/widgets/profile_avatar.dart';
+import '../../../../core/providers/app_providers.dart';
 import '../../data/battle_socket_service.dart';
 import 'battle_match_screen.dart';
 
@@ -24,7 +25,7 @@ class BattleScreen extends ConsumerStatefulWidget {
 }
 
 class _BattleScreenState extends ConsumerState<BattleScreen> {
-  final BattleSocketService _socket = BattleSocketService();
+  late final BattleSocketService _socket = BattleSocketService(ref.read(supabaseClientProvider));
   bool _searching = false;
   bool _searchTooLong = false;
   String? _errorMessage;

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gguiz_battle/app_localizations.dart';
-import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../home/providers/user_provider.dart';
@@ -45,33 +45,31 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> with SingleTicker
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.friendRequestSent), backgroundColor: AppColors.success),
       );
-    } on DioException catch (e) {
+    } on PostgrestException catch (e) {
       if (!mounted) return;
       final msg = _mapError(l10n, e);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(msg), backgroundColor: AppColors.error),
       );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errorGeneric), backgroundColor: AppColors.error),
+      );
     }
   }
 
-  String _mapError(AppLocalizations l10n, DioException e) {
-    final code = (e.response?.data is Map ? (e.response!.data as Map)['message'] : null) as String?;
-    switch (code) {
-      case 'user_not_found':
-        return l10n.errorUserNotFound;
-      case 'cannot_friend_self':
-        return l10n.errorCannotFriendSelf;
-      case 'already_friends':
-        return l10n.errorAlreadyFriends;
-      case 'already_pending':
-        return l10n.errorAlreadyPending;
-      case 'blocked':
-        return l10n.errorBlocked;
-      case 'invalid_code_format':
-        return l10n.errorInvalidCodeFormat;
-      default:
-        return l10n.errorGeneric;
-    }
+  /// Supabase `PostgrestException.message`-də backend RPC `RAISE EXCEPTION`-də
+  /// qaytarılan tag-li mesaj olur. Tag-ə görə user-friendly mesaja çevirir.
+  String _mapError(AppLocalizations l10n, PostgrestException e) {
+    final msg = e.message;
+    if (msg.contains('user_not_found')) return l10n.errorUserNotFound;
+    if (msg.contains('cannot_friend_self')) return l10n.errorCannotFriendSelf;
+    if (msg.contains('already_friends')) return l10n.errorAlreadyFriends;
+    if (msg.contains('already_pending')) return l10n.errorAlreadyPending;
+    if (msg.contains('blocked')) return l10n.errorBlocked;
+    if (msg.contains('invalid_code_format')) return l10n.errorInvalidCodeFormat;
+    return l10n.errorGeneric;
   }
 
   Future<void> _copyCode(String code, AppLocalizations l10n) async {

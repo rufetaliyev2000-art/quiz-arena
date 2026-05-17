@@ -1,12 +1,12 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gguiz_battle/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/providers/device_id_provider.dart';
@@ -14,9 +14,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../home/providers/user_provider.dart';
 
-/// Sosial girişdən dərhal sonra göstərilir — bu cihazı istifadəçinin yeganə
-/// aktiv cihazı kimi qeyd edir. Daxil edilən OTP backend-də `verify-signup-otp`
-/// ilə yoxlanılır və eyni anda `active_device_id` set olunur.
+/// Sosial girişdən sonra göstərilir — bu cihazı yeganə aktiv cihaz kimi qeyd
+/// edir. OTP göndərimi Supabase Auth (`signInWithOtp`) tərəfindən, verify isə
+/// `verifyOtp`. Uğurlu verify sonra `claim_device` RPC backend bayraqları set
+/// edir (signup_otp_verified=true, active_device_id=current).
 class SignupOtpScreen extends ConsumerStatefulWidget {
   const SignupOtpScreen({super.key});
 
@@ -50,46 +51,48 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
     setState(() => _cooldown = 60);
     _cooldownTimer?.cancel();
     _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
+      if (!mounted) { t.cancel(); return; }
       setState(() => _cooldown -= 1);
       if (_cooldown <= 0) t.cancel();
     });
   }
 
+  String? _myEmail() {
+    return ref.read(supabaseClientProvider).auth.currentUser?.email;
+  }
+
   Future<void> _sendOtp({bool initial = false}) async {
     if (_sending || _cooldown > 0) return;
+    final email = _myEmail();
+    if (email == null) {
+      setState(() => _error = AppLocalizations.of(context)!.errorGeneric);
+      return;
+    }
     setState(() {
       _sending = true;
       _error = null;
       if (!initial) _info = null;
     });
     try {
-      final dio = ref.read(dioProvider);
-      final res = await dio.post('/auth/send-signup-otp');
-      final data = res.data as Map<String, dynamic>?;
-      final alreadyVerified = data?['alreadyVerified'] as bool? ?? false;
+      await ref.read(supabaseClientProvider).auth.signInWithOtp(
+            email: email,
+            shouldCreateUser: false,
+          );
       if (!mounted) return;
-      if (alreadyVerified) {
-        // Backend artıq verified olduğunu deyir — birbaşa irəli
-        ref.invalidate(userProfileProvider);
-        context.go('/setup-username');
-        return;
-      }
       final l10n = AppLocalizations.of(context)!;
       setState(() {
         _sending = false;
         _info = l10n.signupOtpSent;
       });
       _startCooldown();
-    } on DioException catch (e) {
+    } on AuthException catch (e) {
       if (!mounted) return;
       final l10n = AppLocalizations.of(context)!;
       setState(() {
         _sending = false;
-        _error = _otpError(l10n, e);
+        _error = e.message.toLowerCase().contains('rate')
+            ? l10n.errorGeneric
+            : l10n.signupOtpInvalid;
       });
     } catch (_) {
       if (!mounted) return;
@@ -104,8 +107,13 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
   Future<void> _verify() async {
     final l10n = AppLocalizations.of(context)!;
     final code = _ctrl.text.trim();
+    final email = _myEmail();
     if (code.length != 6) {
       setState(() => _error = l10n.otpCodeLength);
+      return;
+    }
+    if (email == null) {
+      setState(() => _error = l10n.errorGeneric);
       return;
     }
     setState(() {
@@ -114,23 +122,27 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
       _info = null;
     });
     try {
-      final dio = ref.read(dioProvider);
+      final supabase = ref.read(supabaseClientProvider);
+      await supabase.auth.verifyOTP(
+        email: email,
+        token: code,
+        type: OtpType.email,
+      );
+      // OTP doğrulandı → bu cihazı claim et (signup_otp_verified=true,
+      // active_device_id=current).
       final deviceId = await ref.read(deviceIdServiceProvider).get();
-      await dio.post('/auth/verify-signup-otp', data: {
-        'code': code,
-        'deviceId': deviceId,
-        'deviceLabel': deviceLabel(),
+      await supabase.rpc('claim_device', params: {
+        'p_device_id': deviceId,
+        'p_device_label': deviceLabel(),
       });
       if (!mounted) return;
-      // Backend signup_otp_verified=true və active_device_id qeyd etdi.
-      // Profile cache-i sıfırla ki, splash/router təzə statusu görsün.
       ref.invalidate(userProfileProvider);
       context.go('/setup-username');
-    } on DioException catch (e) {
+    } on AuthException catch (_) {
       if (!mounted) return;
       setState(() {
         _verifying = false;
-        _error = _otpError(l10n, e);
+        _error = l10n.signupOtpInvalid;
       });
     } catch (_) {
       if (!mounted) return;
@@ -139,23 +151,6 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
         _error = l10n.errorGeneric;
       });
     }
-  }
-
-  String _otpError(AppLocalizations l10n, DioException e) {
-    final code = e.response?.statusCode;
-    final data = e.response?.data;
-    String? reason;
-    if (data is Map) {
-      final msg = data['message'];
-      if (msg is String) reason = msg;
-    }
-    if (code == 400) {
-      if (reason == 'invalid_otp' || reason == 'wrong_code' || reason == 'expired') {
-        return l10n.signupOtpInvalid;
-      }
-      return l10n.signupOtpInvalid;
-    }
-    return l10n.errorGeneric;
   }
 
   @override
@@ -172,21 +167,15 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
               children: [
                 const SizedBox(height: 40),
                 Icon(Icons.mark_email_read_rounded, size: 64, color: AppColors.primaryLight)
-                    .animate()
-                    .scale(duration: 500.ms, curve: Curves.elasticOut),
+                    .animate().scale(duration: 500.ms, curve: Curves.elasticOut),
                 const SizedBox(height: 20),
-                Text(l10n.signupOtpTitle,
-                        style: AppTextStyles.displayMedium,
-                        textAlign: TextAlign.center)
-                    .animate()
-                    .fadeIn(delay: 100.ms)
-                    .slideY(begin: 0.2),
+                Text(l10n.signupOtpTitle, style: AppTextStyles.displayMedium, textAlign: TextAlign.center)
+                    .animate().fadeIn(delay: 100.ms).slideY(begin: 0.2),
                 const SizedBox(height: 10),
                 Text(l10n.signupOtpSubtitle,
-                        style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
-                        textAlign: TextAlign.center)
-                    .animate()
-                    .fadeIn(delay: 200.ms),
+                    style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textMuted),
+                    textAlign: TextAlign.center)
+                    .animate().fadeIn(delay: 200.ms),
                 const SizedBox(height: 36),
                 if (_error != null) ...[
                   _banner(_error!, AppColors.error, Icons.error_outline_rounded),
@@ -233,11 +222,7 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
                       ),
                       child: Center(
                         child: _verifying
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                              )
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                             : Text(l10n.signupOtpVerify,
                                 style: AppTextStyles.labelLarge.copyWith(fontSize: 14, letterSpacing: 2)),
                       ),
@@ -249,9 +234,7 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
                   child: TextButton(
                     onPressed: (_cooldown > 0 || _sending) ? null : () => _sendOtp(),
                     child: Text(
-                      _cooldown > 0
-                          ? l10n.signupOtpResendIn(_cooldown)
-                          : l10n.signupOtpResend,
+                      _cooldown > 0 ? l10n.signupOtpResendIn(_cooldown) : l10n.signupOtpResend,
                       style: AppTextStyles.bodyMedium.copyWith(
                         color: _cooldown > 0 ? AppColors.textMuted : AppColors.primaryLight,
                       ),
@@ -274,16 +257,11 @@ class _SignupOtpScreenState extends ConsumerState<SignupOtpScreen> {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(text,
-                style: AppTextStyles.bodyMedium.copyWith(color: color)),
-          ),
-        ],
-      ),
+      child: Row(children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(width: 10),
+        Expanded(child: Text(text, style: AppTextStyles.bodyMedium.copyWith(color: color))),
+      ]),
     ).animate().fadeIn(duration: 200.ms);
   }
 }

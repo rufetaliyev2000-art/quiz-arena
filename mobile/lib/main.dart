@@ -15,8 +15,6 @@ Future<void> main() async {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle.light);
   // ignore: avoid_print
-  print('[main] backendUrl=${ApiConstants.backendUrl}');
-  // ignore: avoid_print
   print('[main] supabaseUrl=${ApiConstants.supabaseUrl}');
   await Supabase.initialize(
     url: ApiConstants.supabaseUrl,

@@ -20,18 +20,11 @@ dependencies:
   # Navigation
   go_router: ^14.6.3
 
-  # Network
-  dio: ^5.7.0
-  retrofit: ^4.4.1
-
   # Storage
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.3.4
 
-  # Realtime
-  socket_io_client: ^3.0.0
-
-  # OAuth (social login) + Supabase Auth
+  # OAuth (social login) + Supabase Auth (DB + Realtime + Storage)
   google_sign_in: ^6.2.2
   sign_in_with_apple: ^6.1.4
   flutter_facebook_auth: ^7.1.1
@@ -59,7 +52,6 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.9.2
   riverpod_generator: ^2.6.1
-  retrofit_generator: ^9.1.5
   flutter_launcher_icons: ^0.14.1
   flutter_native_splash: ^2.4.3
   image: ^4.3.0

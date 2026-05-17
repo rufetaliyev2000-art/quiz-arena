@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 enum MatchOutcome { win, loss, draw, solo }
 
@@ -20,13 +20,6 @@ class MatchOpponent {
     required this.score,
     required this.correctAnswers,
   });
-
-  factory MatchOpponent.fromJson(Map<String, dynamic> j) => MatchOpponent(
-        userId: j['userId'] as String,
-        username: j['username'] as String,
-        score: (j['score'] as num).toInt(),
-        correctAnswers: (j['correctAnswers'] as num).toInt(),
-      );
 }
 
 class MatchHistoryEntry {
@@ -52,33 +45,45 @@ class MatchHistoryEntry {
     required this.opponent,
   });
 
-  factory MatchHistoryEntry.fromJson(Map<String, dynamic> j) => MatchHistoryEntry(
-        matchId: j['matchId'] as String,
-        type: j['type'] as String,
-        status: j['status'] as String,
-        startedAt: j['startedAt'] != null ? DateTime.tryParse(j['startedAt'] as String) : null,
-        endedAt: j['endedAt'] != null ? DateTime.tryParse(j['endedAt'] as String) : null,
-        outcome: _parseOutcome(j['outcome'] as String?),
-        myScore: (j['myScore'] as num).toInt(),
-        myCorrect: (j['myCorrect'] as num).toInt(),
-        opponent: j['opponent'] == null
-            ? null
-            : MatchOpponent.fromJson(j['opponent'] as Map<String, dynamic>),
-      );
+  /// `get_match_history` RPC flat snake_case row qaytarır.
+  factory MatchHistoryEntry.fromRow(Map<String, dynamic> j) {
+    final oppId = j['opponent_id'] as String?;
+    final oppUsername = j['opponent_username'] as String?;
+    return MatchHistoryEntry(
+      matchId: j['match_id'] as String,
+      type: j['type'] as String,
+      status: j['status'] as String,
+      startedAt: j['started_at'] != null ? DateTime.tryParse(j['started_at'] as String) : null,
+      endedAt: j['ended_at'] != null ? DateTime.tryParse(j['ended_at'] as String) : null,
+      outcome: _parseOutcome(j['outcome'] as String?),
+      myScore: ((j['my_score'] as num?) ?? 0).toInt(),
+      myCorrect: ((j['my_correct'] as num?) ?? 0).toInt(),
+      opponent: (oppId == null || oppUsername == null)
+          ? null
+          : MatchOpponent(
+              userId: oppId,
+              username: oppUsername,
+              score: ((j['opponent_score'] as num?) ?? 0).toInt(),
+              correctAnswers: ((j['opponent_correct'] as num?) ?? 0).toInt(),
+            ),
+    );
+  }
 }
 
 class MatchHistoryRepository {
-  final Dio _dio;
-  const MatchHistoryRepository(this._dio);
+  final SupabaseClient _client;
+  const MatchHistoryRepository(this._client);
 
   Future<List<MatchHistoryEntry>> getHistory() async {
     try {
-      final response = await _dio.get('/matches/history');
-      final list = response.data as List;
+      final response = await _client.rpc('get_match_history');
+      final list = response as List<dynamic>;
       return list
-          .map((e) => MatchHistoryEntry.fromJson(e as Map<String, dynamic>))
+          .map((e) => MatchHistoryEntry.fromRow(e as Map<String, dynamic>))
           .toList();
-    } on DioException {
+    } on PostgrestException {
+      return const [];
+    } catch (_) {
       return const [];
     }
   }

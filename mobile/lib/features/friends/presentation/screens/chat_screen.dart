@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gguiz_battle/app_localizations.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/providers/app_providers.dart';
 import '../../../home/providers/user_provider.dart';
 import '../../data/chat_socket_service.dart';
 
@@ -17,7 +18,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
-  final ChatSocketService _socket = ChatSocketService();
+  late final ChatSocketService _socket = ChatSocketService(ref.read(supabaseClientProvider));
   final TextEditingController _ctrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final List<ChatMessage> _messages = [];

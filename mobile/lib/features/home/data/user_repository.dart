@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
-import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class UserProfile {
   final String id;
@@ -121,56 +121,74 @@ class UserProfile {
   }
 }
 
+/// Səhv kodlarını strukturlu formada ötürmək üçün — Supabase PostgrestException
+/// `code` (SQLSTATE) və `message` qaytarır. Bu wrap onları konkret tipə salır.
+class UsernameTakenException implements Exception {
+  const UsernameTakenException();
+}
+class UsernameFormatException implements Exception {
+  const UsernameFormatException();
+}
+
 class UserRepository {
-  final Dio _dio;
+  final SupabaseClient _client;
   final FlutterSecureStorage _storage;
-  const UserRepository(this._dio, this._storage);
+  const UserRepository(this._client, this._storage);
 
   Future<UserProfile> getMe() async {
     try {
       // ignore: avoid_print
-      print('[user_repo] GET /users/me başlayır');
-      final response = await _dio.get('/users/me');
+      print('[user_repo] rpc get_my_profile başlayır');
+      final response = await _client.rpc('get_my_profile');
       // ignore: avoid_print
-      print('[user_repo] GET /users/me OK status=${response.statusCode}');
-      return UserProfile.fromJson(response.data as Map<String, dynamic>);
-    } on DioException catch (e) {
+      print('[user_repo] rpc get_my_profile OK');
+      return UserProfile.fromJson(response as Map<String, dynamic>);
+    } on PostgrestException catch (e) {
       // ignore: avoid_print
-      print('[user_repo] GET /users/me failed: type=${e.type} status=${e.response?.statusCode} data=${e.response?.data}');
-      if (_isNetworkError(e)) {
-        final username = await _storage.read(key: 'username') ?? 'Player';
-        final email = await _storage.read(key: 'email');
-        return UserProfile.offline(username: username, email: email);
+      print('[user_repo] rpc get_my_profile failed: code=${e.code} message=${e.message}');
+      rethrow;
+    } catch (e) {
+      // ignore: avoid_print
+      print('[user_repo] rpc get_my_profile network error: $e');
+      final username = await _storage.read(key: 'username') ?? 'Player';
+      final email = await _storage.read(key: 'email');
+      return UserProfile.offline(username: username, email: email);
+    }
+  }
+
+  /// Username dəyiş + username_set=true et. `username_taken` → istifadəçi adı tutulub.
+  Future<UserProfile> setUsername(String username) async {
+    try {
+      final response = await _client.rpc('set_username', params: {'p_name': username});
+      return UserProfile.fromJson(response as Map<String, dynamic>);
+    } on PostgrestException catch (e) {
+      if (e.message.contains('username_taken') || e.code == '23505') {
+        throw const UsernameTakenException();
+      }
+      if (e.message.contains('username_format') ||
+          e.message.contains('min_three_chars') ||
+          e.code == '22023') {
+        throw const UsernameFormatException();
       }
       rethrow;
     }
   }
 
-  /// Username dəyiş + username_set=true et. 409 → istifadəçi adı tutulub.
-  Future<UserProfile> setUsername(String username) async {
-    final response = await _dio.patch(
-      '/users/me/username',
-      data: {'username': username},
-    );
-    return UserProfile.fromJson(response.data as Map<String, dynamic>);
-  }
-
   /// Canlı yoxlama: bu username istifadəçi tərəfindən götürülə bilərmi?
   /// `reason`: null | 'min_three_chars' | 'format' | 'taken'.
   Future<({bool available, String? reason})> checkUsernameAvailable(String username) async {
-    final response = await _dio.get(
-      '/users/username-available',
-      queryParameters: {'name': username},
-    );
-    final data = response.data as Map<String, dynamic>;
+    final response = await _client.rpc('is_username_available', params: {'p_name': username});
+    final list = response as List<dynamic>;
+    if (list.isEmpty) return (available: false, reason: 'format');
+    final row = list.first as Map<String, dynamic>;
     return (
-      available: data['available'] as bool? ?? false,
-      reason: data['reason'] as String?,
+      available: row['available'] as bool? ?? false,
+      reason: row['reason'] as String?,
     );
   }
 
   /// Bot/solo oyunlarından lokal queue-da yığılan mükafatları backend-ə
-  /// göndərir. Şəbəkə xətası halında [DioException] tullayır — çağıran
+  /// göndərir. Şəbəkə xətası halında [Exception] tullayır — çağıran
   /// lokal queue-da saxlayır və sonradan təkrar göndərir.
   Future<UserProfile> applyReward({
     int xp = 0,
@@ -179,25 +197,13 @@ class UserRepository {
     int losses = 0,
     int draws = 0,
   }) async {
-    final response = await _dio.post(
-      '/users/me/reward',
-      data: {
-        'xp': xp,
-        'coins': coins,
-        'wins': wins,
-        'losses': losses,
-        'draws': draws,
-      },
-    );
-    return UserProfile.fromJson(response.data as Map<String, dynamic>);
-  }
-
-  bool _isNetworkError(DioException e) {
-    return e.response == null ||
-        e.type == DioExceptionType.connectionError ||
-        e.type == DioExceptionType.connectionTimeout ||
-        e.type == DioExceptionType.receiveTimeout ||
-        e.type == DioExceptionType.sendTimeout ||
-        e.type == DioExceptionType.unknown;
+    final response = await _client.rpc('apply_local_reward', params: {
+      'p_xp': xp,
+      'p_coins': coins,
+      'p_wins': wins,
+      'p_losses': losses,
+      'p_draws': draws,
+    });
+    return UserProfile.fromJson(response as Map<String, dynamic>);
   }
 }

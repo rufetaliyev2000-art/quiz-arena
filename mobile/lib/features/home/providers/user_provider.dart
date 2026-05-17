@@ -4,7 +4,7 @@ import '../../auth/providers/auth_provider.dart';
 import '../data/user_repository.dart';
 
 final userRepositoryProvider = Provider<UserRepository>((ref) {
-  return UserRepository(ref.watch(dioProvider), ref.watch(storageProvider));
+  return UserRepository(ref.watch(supabaseClientProvider), ref.watch(storageProvider));
 });
 
 /// Auth status-a abunədir — login/logout dəyişəndə avtomatik yenidən fetch edir.

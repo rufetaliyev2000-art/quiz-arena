@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gguiz_battle/app_localizations.dart';
@@ -133,16 +132,18 @@ class _ProfileCustomizationSheetState extends ConsumerState<_ProfileCustomizatio
       try {
         await ref.read(userRepositoryProvider).setUsername(newName);
         ref.invalidate(userProfileProvider);
-      } on DioException catch (e) {
+      } on UsernameTakenException {
         if (!mounted) return;
-        final code = e.response?.statusCode;
         setState(() {
           _saving = false;
-          _usernameError = code == 409
-              ? l10n.usernameSetupErrorTaken
-              : code == 400
-                  ? l10n.usernameSetupErrorFormat
-                  : l10n.usernameSetupSaveFailed;
+          _usernameError = l10n.usernameSetupErrorTaken;
+        });
+        return;
+      } on UsernameFormatException {
+        if (!mounted) return;
+        setState(() {
+          _saving = false;
+          _usernameError = l10n.usernameSetupErrorFormat;
         });
         return;
       } catch (_) {

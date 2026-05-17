@@ -3,7 +3,7 @@ import '../../../core/providers/app_providers.dart';
 import '../data/match_history_repository.dart';
 
 final matchHistoryRepositoryProvider = Provider<MatchHistoryRepository>((ref) {
-  return MatchHistoryRepository(ref.watch(dioProvider));
+  return MatchHistoryRepository(ref.watch(supabaseClientProvider));
 });
 
 final matchHistoryProvider = FutureProvider<List<MatchHistoryEntry>>((ref) async {

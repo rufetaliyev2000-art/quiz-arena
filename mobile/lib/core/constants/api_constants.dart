@@ -1,17 +1,7 @@
 class ApiConstants {
   ApiConstants._();
 
-  /// Public Railway backend URL (yeni Gmail hesabı altında, 2026-05-15).
-  static const String backendUrl = 'https://quiz-arena-backend-production-9a82.up.railway.app';
-  static const String wsUrl = 'wss://quiz-arena-backend-production-9a82.up.railway.app';
-
-  static const String baseUrl = '$backendUrl/api/v1';
-  static const String socketUrl = '$wsUrl/game';
-
-  static const Duration connectTimeout = Duration(seconds: 10);
-  static const Duration receiveTimeout = Duration(seconds: 15);
-
-  /// Supabase (auth + DB)
+  /// Supabase (auth + DB + Realtime + Storage)
   static const String supabaseUrl = 'https://odjfodvdrmcmdsollhfk.supabase.co';
 
   /// Public anon/publishable key — embedded olur, təhlükəsizdir.
